@@ -101,7 +101,7 @@ static menuStatus_t menuQuickVFOExitStatus = MENU_STATUS_SUCCESS;
 
 static bool quickmenuNewChannelHandled = false; // Quickmenu new channel confirmation window
 
-static const int VFO_SWEEP_STEP_TIME  = 25;// 25ms
+static const int VFO_SWEEP_STEP_TIME  = 12;// 12ms
 
 #if defined(PLATFORM_RD5R)
 #define VFO_SWEEP_GRAPH_START_Y     8
@@ -128,7 +128,6 @@ static uint8_t vfoSweepGain = VFO_SWEEP_GAIN_DEFAULT;
 static bool vfoSweepSavedBandwidth;
 #if defined(VFO_SWEEP_WATERFALL)
 static uint16_t vfoSweepWaterfallPalette[32];	// RSSI-to-colour LUT in native pixel format
-static uint16_t vfoSweepWaterfallMarkerColour;	// centre-frequency marker
 #endif
 const int VFO_SWEEP_SCAN_FREQ_STEP_TABLE[7] 		= {125,250,500,1000,2500,5000,10000};
 static uint8_t previousVFONumber = 0xFF; // Keep track of the currently loaded channel data
@@ -481,7 +480,19 @@ void uiVFOModeUpdateScreen(int txTimeSecs)
 		uiDataGlobal.displayQSOState = QSO_DISPLAY_DEFAULT_SCREEN;
 	}
 
-	displayClearBuf();
+#if defined(VFO_SWEEP_WATERFALL)
+	if (screenOperationMode[nonVolatileSettings.currentVFONumber] == VFO_SCREEN_OPERATION_SWEEP)
+	{
+		// Keep the waterfall history across the redraw; clear only around it.
+		displayFillRect(0, 0, DISPLAY_SIZE_X, VFO_SWEEP_WATERFALL_START_Y, true);
+		displayFillRect(0, (VFO_SWEEP_WATERFALL_START_Y + VFO_SWEEP_WATERFALL_HEIGHT), DISPLAY_SIZE_X,
+				(DISPLAY_SIZE_Y - (VFO_SWEEP_WATERFALL_START_Y + VFO_SWEEP_WATERFALL_HEIGHT)), true);
+	}
+	else
+#endif
+	{
+		displayClearBuf();
+	}
 	uiUtilityRenderHeader(uiVFOModeDualWatchIsScanning(), uiVFOModeSweepScanning(true),
 #if defined(PLATFORM_MD9600) || defined(CPU_MK22FN512VLL12)
 			false
@@ -2256,11 +2267,11 @@ static void vfoSweepBuildWaterfallPalette(void)
 
 		vfoSweepWaterfallPalette[i] = displayConvertRGB888ToNative((r << 16) | (g << 8) | bl);
 	}
-
-	vfoSweepWaterfallMarkerColour = displayConvertRGB888ToNative(0xFFFFFF);
 }
 
 // Scroll the waterfall history down one pixel so the freshest sweep stays on top.
+// The history lives only in the framebuffer; uiVFOModeUpdateScreen() leaves this
+// region untouched while sweeping so it is never wiped by a redraw.
 static void vfoSweepWaterfallScroll(void)
 {
 	uint16_t *fb = displayGetScreenBuffer();
@@ -2271,8 +2282,8 @@ static void vfoSweepWaterfallScroll(void)
 	}
 }
 
-// Slide the whole waterfall history sideways to follow a retune, blanking the
-// columns whose frequencies have not been swept yet (mirrors the sample buffer).
+// Slide the waterfall history sideways to follow a retune, blanking the columns
+// whose frequencies have not been swept yet (mirrors the sample buffer).
 static void vfoSweepWaterfallShift(int pixels)
 {
 	uint16_t *fb = displayGetScreenBuffer();
@@ -2325,8 +2336,7 @@ static void vfoSweepDrawSample(int offset)
 	// Waterfall: one frequency bin -> one colour pixel on the top waterfall row.
 	int level = MIN(31, (rssi * 31) / vfoSweepGain);
 
-	displayGetScreenBuffer()[(VFO_SWEEP_WATERFALL_START_Y * DISPLAY_SIZE_X) + offset] =
-			((offset == (DISPLAY_SIZE_X >> 1)) ? vfoSweepWaterfallMarkerColour : vfoSweepWaterfallPalette[level]);
+	displayGetScreenBuffer()[(VFO_SWEEP_WATERFALL_START_Y * DISPLAY_SIZE_X) + offset] = vfoSweepWaterfallPalette[level];
 #else
 	int16_t graphHeight = MAX(vfoSweepSamples[offset] - vfoSweepRssiNoiseFloor, 0);
 	graphHeight = (graphHeight * VFO_SWEEP_GRAPH_HEIGHT_Y) / vfoSweepGain;
@@ -3579,6 +3589,7 @@ static void sweepScanInit(void)
 
 #if defined(VFO_SWEEP_WATERFALL)
 	vfoSweepBuildWaterfallPalette();
+	vfoSweepWaterfallClear();
 #endif
 
 	screenOperationMode[nonVolatileSettings.currentVFONumber] = VFO_SCREEN_OPERATION_SWEEP;
@@ -3590,13 +3601,6 @@ static void sweepScanInit(void)
 	menuSystemPopAllAndDisplaySpecificRootMenu(UI_VFO_MODE, true);
 
 	vfoSweepUpdateSamples(0, true, 0);
-
-#if defined(VFO_SWEEP_WATERFALL)
-	// The band-scope bars were just drawn; start the waterfall history empty.
-	vfoSweepWaterfallClear();
-	displayRenderRows(1, ((8 + VFO_SWEEP_GRAPH_HEIGHT_Y) / 8) + 1);
-#endif
-
 	headerRowIsDirty = true;
 
 	// trxCheck*Squelch() won't be called while sweeping, blindly turn the
