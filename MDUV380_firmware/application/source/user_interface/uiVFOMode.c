@@ -106,11 +106,20 @@ static const int VFO_SWEEP_STEP_TIME  = 25;// 25ms
 #define VFO_SWEEP_GRAPH_HEIGHT_Y   38
 #endif
 
+// Colour-display platforms render the sweep as a scrolling waterfall.
+#if defined(PLATFORM_MD380) || defined(PLATFORM_MDUV380) || defined(PLATFORM_RT84_DM1701) || defined(PLATFORM_MD2017)
+#define VFO_SWEEP_WATERFALL
+#endif
+
 
 static uint8_t vfoSweepSamples[VFO_SWEEP_NUM_SAMPLES];
 static uint8_t vfoSweepRssiNoiseFloor = VFO_SWEEP_RSSI_NOISE_FLOOR_DEFAULT;
 static uint8_t vfoSweepGain = VFO_SWEEP_GAIN_DEFAULT;
 static bool vfoSweepSavedBandwidth;
+#if defined(VFO_SWEEP_WATERFALL)
+static uint16_t vfoSweepWaterfallPalette[32];	// RSSI-to-colour LUT in native pixel format
+static uint16_t vfoSweepWaterfallMarkerColour;	// centre-frequency marker
+#endif
 const int VFO_SWEEP_SCAN_FREQ_STEP_TABLE[7] 		= {125,250,500,1000,2500,5000,10000};
 static uint8_t previousVFONumber = 0xFF; // Keep track of the currently loaded channel data
 
@@ -142,8 +151,10 @@ menuStatus_t uiVFOMode(uiEvent_t *ev, bool isFirstRun)
 					vfoSweepDrawSample(i);
 				}
 
+#if !defined(VFO_SWEEP_WATERFALL)
 				displayDrawFastVLine((uiDataGlobal.Scan.sweepSampleIndex) % VFO_SWEEP_NUM_SAMPLES, VFO_SWEEP_GRAPH_START_Y, VFO_SWEEP_GRAPH_HEIGHT_Y, true);// draw solid line in the next location
 				displayDrawFastVLine((uiDataGlobal.Scan.sweepSampleIndex + uiDataGlobal.Scan.sweepSampleIndexIncrement) % VFO_SWEEP_NUM_SAMPLES, VFO_SWEEP_GRAPH_START_Y, VFO_SWEEP_GRAPH_HEIGHT_Y, true);// draw solid line in the next location
+#endif
 
 				displayRenderRows(1, ((8 + VFO_SWEEP_GRAPH_HEIGHT_Y) / 8) + 1);
 			}
@@ -2214,8 +2225,50 @@ static void handleDownKey(uiEvent_t *ev)
 	}
 }
 
+#if defined(VFO_SWEEP_WATERFALL)
+// The native 16-bit pixel format depends on the runtime panel type, hence the
+// palette is built at sweep entry rather than stored as a constant.
+static void vfoSweepBuildWaterfallPalette(void)
+{
+	static const uint32_t stops[5] = { 0x000040, 0x0000FF, 0x00FFFF, 0xFFFF00, 0xFF0000 };
+
+	for (int i = 0; i < 32; i++)
+	{
+		uint32_t a = stops[i >> 3];
+		uint32_t b = stops[(i >> 3) + 1];
+		int t = (i & 0x7);
+		uint32_t r  = ((((a >> 16) & 0xFF) * (8 - t)) + (((b >> 16) & 0xFF) * t)) / 8;
+		uint32_t g  = ((((a >> 8)  & 0xFF) * (8 - t)) + (((b >> 8)  & 0xFF) * t)) / 8;
+		uint32_t bl = (((a & 0xFF) * (8 - t)) + ((b & 0xFF) * t)) / 8;
+
+		vfoSweepWaterfallPalette[i] = displayConvertRGB888ToNative((r << 16) | (g << 8) | bl);
+	}
+
+	vfoSweepWaterfallMarkerColour = displayConvertRGB888ToNative(0xFFFFFF);
+}
+
+// Scroll the waterfall region down one pixel so the freshest sweep stays on top.
+static void vfoSweepWaterfallScroll(void)
+{
+	uint16_t *fb = displayGetScreenBuffer();
+
+	for (int y = (VFO_SWEEP_GRAPH_START_Y + VFO_SWEEP_GRAPH_HEIGHT_Y - 1); y > VFO_SWEEP_GRAPH_START_Y; y--)
+	{
+		memmove(&fb[y * DISPLAY_SIZE_X], &fb[(y - 1) * DISPLAY_SIZE_X], DISPLAY_SIZE_X * sizeof(uint16_t));
+	}
+}
+#endif
+
 static void vfoSweepDrawSample(int offset)
 {
+#if defined(VFO_SWEEP_WATERFALL)
+	// One frequency bin -> one colour pixel on the top waterfall row.
+	int level = MAX(vfoSweepSamples[offset] - vfoSweepRssiNoiseFloor, 0);
+	level = MIN(31, (level * 31) / vfoSweepGain);
+
+	displayGetScreenBuffer()[(VFO_SWEEP_GRAPH_START_Y * DISPLAY_SIZE_X) + offset] =
+			((offset == (DISPLAY_SIZE_X >> 1)) ? vfoSweepWaterfallMarkerColour : vfoSweepWaterfallPalette[level]);
+#else
 	int16_t graphHeight = MAX(vfoSweepSamples[offset] - vfoSweepRssiNoiseFloor, 0);
 	graphHeight = (graphHeight * VFO_SWEEP_GRAPH_HEIGHT_Y) / vfoSweepGain;
 	graphHeight = MIN(VFO_SWEEP_GRAPH_HEIGHT_Y, graphHeight);
@@ -2243,6 +2296,7 @@ static void vfoSweepDrawSample(int offset)
 	}
 
 	displayThemeResetToDefault();
+#endif
 }
 
 static void vfoSweepUpdateSamples(int offset, bool forceRedraw, int bandwidthRescale)
@@ -3456,6 +3510,10 @@ static void sweepScanInit(void)
 	vfoSweepRssiNoiseFloor = ((nonVolatileSettings.vfoSweepSettings >> 7) & 0x1F);
 	vfoSweepGain = (nonVolatileSettings.vfoSweepSettings & 0x7F);
 
+#if defined(VFO_SWEEP_WATERFALL)
+	vfoSweepBuildWaterfallPalette();
+#endif
+
 	screenOperationMode[nonVolatileSettings.currentVFONumber] = VFO_SCREEN_OPERATION_SWEEP;
 
 	uiDataGlobal.displayQSOState = QSO_DISPLAY_DEFAULT_SCREEN;
@@ -3465,6 +3523,14 @@ static void sweepScanInit(void)
 	menuSystemPopAllAndDisplaySpecificRootMenu(UI_VFO_MODE, true);
 
 	vfoSweepUpdateSamples(0, true, 0);
+
+#if defined(VFO_SWEEP_WATERFALL)
+	// Start from a cleared region so no stale pixels show before the waterfall fills.
+	memset(&displayGetScreenBuffer()[VFO_SWEEP_GRAPH_START_Y * DISPLAY_SIZE_X], 0x00,
+			VFO_SWEEP_GRAPH_HEIGHT_Y * DISPLAY_SIZE_X * sizeof(uint16_t));
+	displayRenderRows(1, ((8 + VFO_SWEEP_GRAPH_HEIGHT_Y) / 8) + 1);
+#endif
+
 	headerRowIsDirty = true;
 
 	// trxCheck*Squelch() won't be called while sweeping, blindly turn the
@@ -3499,10 +3565,12 @@ static void sweepScanStep(void)
 
 			uiDataGlobal.Scan.sweepSampleIndex += uiDataGlobal.Scan.sweepSampleIndexIncrement;
 
+#if !defined(VFO_SWEEP_WATERFALL)
 			displayThemeApply(THEME_ITEM_FG_RX_FREQ, THEME_ITEM_BG);
 			displayDrawFastVLine((uiDataGlobal.Scan.sweepSampleIndex) % VFO_SWEEP_NUM_SAMPLES, VFO_SWEEP_GRAPH_START_Y, VFO_SWEEP_GRAPH_HEIGHT_Y, true);// draw solid line in the next location
 			displayDrawFastVLine((uiDataGlobal.Scan.sweepSampleIndex + uiDataGlobal.Scan.sweepSampleIndexIncrement) % VFO_SWEEP_NUM_SAMPLES, VFO_SWEEP_GRAPH_START_Y, VFO_SWEEP_GRAPH_HEIGHT_Y, true);// draw solid line in the next location
 			displayThemeResetToDefault();
+#endif
 
 			if (uiNotificationIsVisible())
 			{
@@ -3515,6 +3583,11 @@ static void sweepScanStep(void)
 		}
 		else
 		{
+#if defined(VFO_SWEEP_WATERFALL)
+			// A full sweep just completed: push it down as a new waterfall row.
+			vfoSweepWaterfallScroll();
+			displayRenderRows(1, ((8 + VFO_SWEEP_GRAPH_HEIGHT_Y) / 8) + 1);
+#endif
 			uiDataGlobal.Scan.sweepSampleIndex = 0;
 			uiDataGlobal.Scan.sweepSampleIndexIncrement = 1;// go back to normal increment at the end of the special sweep step used just after the graph is zoomed in
 		}
