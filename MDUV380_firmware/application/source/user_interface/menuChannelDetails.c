@@ -363,7 +363,7 @@ static void updateScreen(bool isFirstRun, bool allowedToSpeakUpdate)
 					break;
 					case CH_DETAILS_USE_LOCATION:
 						leftSide = currentLanguage->use_location_short;
-						rightSideConst = (rootMenuIsVFO ? currentLanguage->n_a : ((codeplugChannelGetFlag(&tmpChannel, CHANNEL_FLAG_USE_LOCATION) != 0) ? currentLanguage->yes : currentLanguage->no));
+						rightSideConst = (rootMenuIsVFO ? currentLanguage->n_a : (codeplugChannelLocationIsValid(&tmpChannel) ? currentLanguage->yes : currentLanguage->no));
 						break;
 					case CH_DETAILS_LOCATION_LAT:
 						leftSide = currentLanguage->latitude_short;
@@ -1185,12 +1185,7 @@ static void handleEvent(uiEvent_t *ev)
 						tmpChannel.chMode = RADIO_MODE_ANALOG;
 					}
 					break;
-				case CH_DETAILS_USE_LOCATION:
-					if (rootMenuIsVFO == false)
-					{
-						codeplugChannelSetFlag(&tmpChannel, CHANNEL_FLAG_USE_LOCATION, 1);
-					}
-					break;
+				case CH_DETAILS_USE_LOCATION: // NOOP - derived from coordinates
 				case CH_DETAILS_LOCATION_LAT: // NOOP
 				case CH_DETAILS_LOCATION_LON:
 					break;
@@ -1421,12 +1416,7 @@ static void handleEvent(uiEvent_t *ev)
 						codeplugChannelSetFlag(&tmpChannel, CHANNEL_FLAG_BW_25K, 0);// clear 25kHz bit
 					}
 					break;
-				case CH_DETAILS_USE_LOCATION:
-					if (rootMenuIsVFO == false)
-					{
-						codeplugChannelSetFlag(&tmpChannel, CHANNEL_FLAG_USE_LOCATION, 0);
-					}
-					break;
+				case CH_DETAILS_USE_LOCATION: // NOOP - derived from coordinates
 				case CH_DETAILS_LOCATION_LAT: // NOOP
 				case CH_DETAILS_LOCATION_LON:
 					break;
