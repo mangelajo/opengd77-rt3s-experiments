@@ -116,6 +116,37 @@ $(BUILD_DIR)/%.o: %.S
 clean:
 	rm -rf $(BUILD_DIR)
 
+# --- containerised build (run from the HOST) --------------------------------
+# The firmware needs the Linux-only codec_cleaner helper, so it is compiled
+# inside a podman container.  "make build" drives that builder; the actual
+# in-container compile is the default "all" target above.  Override BUILDER
+# on the command line if the wrapper lives elsewhere:
+#     make build BUILDER=/path/to/build.sh
+BUILDER ?= ../../../build/build.sh
+
+.PHONY: build rebuild help
+
+build:
+	$(BUILDER)
+
+rebuild:
+	$(BUILDER) clean
+	$(BUILDER)
+
+help:
+	@echo 'OpenGD77 MDUV380 firmware -- make targets (run from MDUV380_firmware/):'
+	@echo ''
+	@echo '  make build     Compile the firmware (build/OpenMDUV380.bin) via podman'
+	@echo '  make rebuild   Clean and compile from scratch'
+	@echo '  make flash     Flash the firmware to an MD-UV380 held in DFU mode'
+	@echo '  make flash-md2017 | flash-dm1701 | flash-md380'
+	@echo '                 Flash for another radio family (upload cipher only)'
+	@echo '  make clean     Remove the build/ directory'
+	@echo '  make help      Show this help'
+	@echo ''
+	@echo 'Build, then flash:  make build && make flash'
+	@echo '(put the radio in DFU mode first: power off, hold SK1, power on)'
+
 # --- flash targets ----------------------------------------------------------
 # Run these from the HOST (not via the podman build wrapper) — flashing needs
 # direct USB access.  Put the radio in DFU mode first (power off, hold SK1,
@@ -138,7 +169,7 @@ FIRMWARE_BIN := $(BUILD_DIR)/OpenMDUV380.bin
 flash: flash-mduv380
 
 flash-mduv380 flash-md2017 flash-dm1701 flash-md380:
-	@test -f $(FIRMWARE_BIN) || { echo "ERROR: $(FIRMWARE_BIN) missing — run build.sh first." >&2; exit 1; }
+	@test -f $(FIRMWARE_BIN) || { echo "ERROR: $(FIRMWARE_BIN) missing — run 'make build' first." >&2; exit 1; }
 	$(PYTHON) $(LOADER) -m $(PLATFORM) -f $(FIRMWARE_BIN)
 
 flash-mduv380: PLATFORM := MD-UV380
