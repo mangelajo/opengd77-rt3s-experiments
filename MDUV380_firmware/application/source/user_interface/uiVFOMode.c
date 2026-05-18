@@ -2577,7 +2577,30 @@ static void setSweepIncDecSetting(sweepSetting_t type, bool increment)
 
 	if (apply)
 	{
+		// A span (zoom) change moves the start/end frequency labels and the Rx
+		// frequency line. Those are only drawn by uiVFOModeUpdateScreen() in its
+		// QSO_DISPLAY_DEFAULT_SCREEN path; otherwise it takes the QSO_DISPLAY_IDLE
+		// no-op path. Force the full-redraw path (as handleUpKey()/handleDownKey()
+		// do) so the lower details are redrawn and rendered before the span
+		// notification is overlaid on top.
+		if (type == SWEEP_SETTING_STEP)
+		{
+			uiDataGlobal.displayQSOState = QSO_DISPLAY_DEFAULT_SCREEN;
+			uiVFOModeUpdateScreen(0);
+		}
+
 		vfoSweepUpdateSamples(0, true, bandwidthRescaleDirection);
+
+		if (type == SWEEP_SETTING_STEP)
+		{
+			// Flash the new span, the same way vfoSweepChangeResolution()
+			// announces the per-bar resolution.
+			int span = (VFO_SWEEP_SCAN_RANGE_SAMPLE_STEP_TABLE[uiDataGlobal.Scan.sweepStepSizeIndex] * VFO_SWEEP_NUM_SAMPLES) / (VFO_SWEEP_PIXELS_PER_STEP * 100);
+			char buf[SCREEN_LINE_BUFFER_SIZE];
+
+			snprintf(buf, SCREEN_LINE_BUFFER_SIZE, "+/-%dkHz", (span >> 1));
+			uiNotificationShow(NOTIFICATION_TYPE_MESSAGE, NOTIFICATION_ID_MESSAGE, 1000, buf, true);
+		}
 	}
 }
 
