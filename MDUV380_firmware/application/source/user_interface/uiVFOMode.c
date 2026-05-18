@@ -2602,8 +2602,12 @@ static void vfoSweepChangeResolution(bool finer)
 
 	uiDataGlobal.Scan.sweepSampleIndex = 0; // restart so the pixel groups stay aligned
 
+	// Also show the swept span (the "bandwidth" set by the step size).
+	int sweepRange = VFO_SWEEP_SCAN_RANGE_SAMPLE_STEP_TABLE[uiDataGlobal.Scan.sweepStepSizeIndex];
+	int spanKHz = (sweepRange * VFO_SWEEP_NUM_SAMPLES / VFO_SWEEP_PIXELS_PER_STEP) / 100;
+
 	char buf[SCREEN_LINE_BUFFER_SIZE];
-	snprintf(buf, SCREEN_LINE_BUFFER_SIZE, "Res /%d", vfoSweepResolution);
+	snprintf(buf, SCREEN_LINE_BUFFER_SIZE, "Res /%d  %dkHz", vfoSweepResolution, spanKHz);
 	uiNotificationShow(NOTIFICATION_TYPE_MESSAGE, NOTIFICATION_ID_MESSAGE, 1000, buf, true);
 }
 
