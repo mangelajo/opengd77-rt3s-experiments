@@ -1473,6 +1473,13 @@ static void handleEvent(uiEvent_t *ev)
 					announceItem(PROMPT_SEQUENCE_TS, PROMPT_THRESHOLD_1);
 				}
 			}
+			else if (uiVFOModeSweepScanning(true) && BUTTONCHECK_DOWN(ev, BUTTON_SK1)
+					&& (KEYCHECK_SHORTUP(ev->keys, KEY_ROTARY_INCREMENT) || KEYCHECK_SHORTUP(ev->keys, KEY_ROTARY_DECREMENT)))
+			{
+				// SK1 + wheel: adjust the sweep resolution
+				vfoSweepChangeResolution(KEYCHECK_SHORTUP(ev->keys, KEY_ROTARY_INCREMENT));
+				return;
+			}
 			else if(uiVFOModeSweepScanning(true) &&  // Reset Sweep noise floor or Sweep Gain
 					((KEYCHECK_SHORTUP(ev->keys, KEY_DOWN) || KEYCHECK_SHORTUP(ev->keys, KEY_UP)
 #if defined(PLATFORM_MDUV380) || defined(PLATFORM_MD380) || defined(PLATFORM_RT84_DM1701) || defined(PLATFORM_MD2017)
@@ -1766,12 +1773,6 @@ static void handleEvent(uiEvent_t *ev)
 			{
 				if (uiVFOModeSweepScanning(true))
 				{
-					if (BUTTONCHECK_DOWN(ev, BUTTON_SK1))
-					{
-						vfoSweepChangeResolution(true); // SK1 + Right: finer
-						return;
-					}
-
 					if (BUTTONCHECK_DOWN(ev, BUTTON_SK2))
 #if defined(PLATFORM_MD380) || defined(PLATFORM_MDUV380)
 					// In Sweep scan, Right increase RSSI or GAIN
@@ -1875,12 +1876,6 @@ static void handleEvent(uiEvent_t *ev)
 			{
 				if (uiVFOModeSweepScanning(true))
 				{
-					if (BUTTONCHECK_DOWN(ev, BUTTON_SK1))
-					{
-						vfoSweepChangeResolution(false); // SK1 + Left: coarser
-						return;
-					}
-
 					if (BUTTONCHECK_DOWN(ev, BUTTON_SK2))
 #if defined(PLATFORM_MD380) || defined(PLATFORM_MDUV380)
 					// In Sweep scan, Right decrease RSSI or GAIN
@@ -2586,8 +2581,8 @@ static void setSweepIncDecSetting(sweepSetting_t type, bool increment)
 	}
 }
 
-// SK1 + Left/Right adjust the sweep resolution (pixels per measurement) and
-// flash the new value, since it has no permanent spot on the sweep screen.
+// SK1 + wheel adjusts the sweep resolution (pixels per measurement) and
+// flashes the new value, since it has no permanent spot on the sweep screen.
 static void vfoSweepChangeResolution(bool finer)
 {
 	if (finer)
@@ -2599,7 +2594,7 @@ static void vfoSweepChangeResolution(bool finer)
 	}
 	else
 	{
-		if (vfoSweepResolution < 8)
+		if (vfoSweepResolution < 16)
 		{
 			vfoSweepResolution *= 2;
 		}
