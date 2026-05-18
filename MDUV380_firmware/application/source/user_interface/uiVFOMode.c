@@ -101,7 +101,7 @@ static menuStatus_t menuQuickVFOExitStatus = MENU_STATUS_SUCCESS;
 
 static bool quickmenuNewChannelHandled = false; // Quickmenu new channel confirmation window
 
-static const int VFO_SWEEP_STEP_TIME  = 12;// 12ms
+static const int VFO_SWEEP_STEP_TIME  = 25;// 25ms
 
 #if defined(PLATFORM_RD5R)
 #define VFO_SWEEP_GRAPH_START_Y     8
@@ -125,6 +125,7 @@ static const int VFO_SWEEP_STEP_TIME  = 12;// 12ms
 static uint8_t vfoSweepSamples[VFO_SWEEP_NUM_SAMPLES];
 static uint8_t vfoSweepRssiNoiseFloor = VFO_SWEEP_RSSI_NOISE_FLOOR_DEFAULT;
 static uint8_t vfoSweepGain = VFO_SWEEP_GAIN_DEFAULT;
+static uint8_t vfoSweepResolution = 1;	// pixels per measurement (1,2,4,8); higher is coarser and faster
 static bool vfoSweepSavedBandwidth;
 #if defined(VFO_SWEEP_WATERFALL)
 static uint16_t vfoSweepWaterfallPalette[32];	// RSSI-to-colour LUT in native pixel format
@@ -1748,6 +1749,17 @@ static void handleEvent(uiEvent_t *ev)
 			{
 				if (uiVFOModeSweepScanning(true))
 				{
+					if (BUTTONCHECK_DOWN(ev, BUTTON_SK1))
+					{
+						// SK1 + Right: finer sweep resolution
+						if (vfoSweepResolution > 1)
+						{
+							vfoSweepResolution /= 2;
+							uiDataGlobal.Scan.sweepSampleIndex = 0;
+						}
+						return;
+					}
+
 					if (BUTTONCHECK_DOWN(ev, BUTTON_SK2))
 #if defined(PLATFORM_MD380) || defined(PLATFORM_MDUV380)
 					// In Sweep scan, Right increase RSSI or GAIN
@@ -1851,6 +1863,17 @@ static void handleEvent(uiEvent_t *ev)
 			{
 				if (uiVFOModeSweepScanning(true))
 				{
+					if (BUTTONCHECK_DOWN(ev, BUTTON_SK1))
+					{
+						// SK1 + Left: coarser sweep resolution
+						if (vfoSweepResolution < 8)
+						{
+							vfoSweepResolution *= 2;
+							uiDataGlobal.Scan.sweepSampleIndex = 0;
+						}
+						return;
+					}
+
 					if (BUTTONCHECK_DOWN(ev, BUTTON_SK2))
 #if defined(PLATFORM_MD380) || defined(PLATFORM_MDUV380)
 					// In Sweep scan, Right decrease RSSI or GAIN
@@ -3629,11 +3652,17 @@ static void sweepScanStep(void)
 			radioReadRSSIAndNoise();
 #endif
 
-			vfoSweepSamples[uiDataGlobal.Scan.sweepSampleIndex] = radioDevices[RADIO_DEVICE_PRIMARY].trxRxSignal;// Need to save the samples so for when the freq is changed and we need to scroll the display
+			// One RSSI reading is shown across vfoSweepResolution pixels, so a
+			// coarser resolution needs proportionally fewer retune/measure steps.
+			uint8_t sweepSignal = radioDevices[RADIO_DEVICE_PRIMARY].trxRxSignal;// Need to save the samples so for when the freq is changed and we need to scroll the display
 
-			vfoSweepDrawSample(uiDataGlobal.Scan.sweepSampleIndex);
+			for (int j = 0; (j < vfoSweepResolution) && ((uiDataGlobal.Scan.sweepSampleIndex + j) < VFO_SWEEP_NUM_SAMPLES); j++)
+			{
+				vfoSweepSamples[uiDataGlobal.Scan.sweepSampleIndex + j] = sweepSignal;
+				vfoSweepDrawSample(uiDataGlobal.Scan.sweepSampleIndex + j);
+			}
 
-			uiDataGlobal.Scan.sweepSampleIndex += uiDataGlobal.Scan.sweepSampleIndexIncrement;
+			uiDataGlobal.Scan.sweepSampleIndex += vfoSweepResolution;
 
 #if !defined(VFO_SWEEP_WATERFALL)
 			displayThemeApply(THEME_ITEM_FG_RX_FREQ, THEME_ITEM_BG);
