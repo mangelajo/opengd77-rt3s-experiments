@@ -2363,8 +2363,9 @@ static void vfoSweepDrawSample(int offset)
 	displayDrawFastVLine(offset, ((VFO_SWEEP_GRAPH_START_Y + VFO_SWEEP_BARS_HEIGHT) - barHeight), barHeight, true); // Level
 	displayThemeResetToDefault();
 
-	// Centre-frequency marker: a dotted line down the band-scope bars.
-	if (offset == (DISPLAY_SIZE_X >> 1))
+	// Centre-frequency marker: a dotted line down the middle of the centre bar,
+	// which spans vfoSweepResolution pixels starting at the centre column.
+	if (offset == ((DISPLAY_SIZE_X >> 1) + (vfoSweepResolution >> 1)))
 	{
 		displayThemeApply(THEME_ITEM_FG_DECORATION, THEME_ITEM_BG);
 		for (int16_t y = VFO_SWEEP_GRAPH_START_Y; y < (VFO_SWEEP_GRAPH_START_Y + VFO_SWEEP_BARS_HEIGHT); y += 2)
