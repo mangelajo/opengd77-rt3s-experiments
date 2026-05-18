@@ -36,57 +36,65 @@ void codecDecode(uint8_t *indata_ptr, int numbBlocks)
 {
 	uint16_t bitbuffer_decode[49];
 
-
-	register int r0 asm ("r0") __attribute__((unused));
-	register int r1 asm ("r1") __attribute__((unused));
-	register int r2 asm ("r2") __attribute__((unused));
-
     for (int idx = 0; idx < numbBlocks; idx++)
     {
 		initFrame(indata_ptr, bitbuffer_decode);
 		indata_ptr += 9;
 
 		soundSetupBuffer();// this just sets currentWaveBuffer but the compiler seems to optimise out the code if I try to do it in this file
-		r2 = (int)bitbuffer_decode;
-		r0 = (int)currentWaveBuffer;
-		r1 = (int)ambebuffer_decode;
+		{
+			// R0/R1/R2 carry the call arguments into the codec. Bind via
+			// register-local variables and tie them to the asm via input
+			// constraints so modern gcc cannot drop the assignments.
+			register int r0 asm ("r0") = (int)currentWaveBuffer;
+			register int r1 asm ("r1") = (int)ambebuffer_decode;
+			register int r2 asm ("r2") = (int)bitbuffer_decode;
 
-		asm volatile (
-			"PUSH {R4-R11}\n"
-			"SUB SP, SP, #0x10\n"
-			"STR R1, [SP, #0x08]\n"
-			"LDR R1, =0\n"
-			"STR R1, [SP, #0x04]\n"
-			"LDR R1, =0\n"
-			"STR R1, [SP, #0x00]\n"
-			"LDR R3, =0\n"
-			"LDR R1, =80\n"
-			"BL " QU(AMBE_DECODE)
-			"ADD SP, SP, #0x10\n"
-			"POP {R4-R11}"
-		);
+			asm volatile (
+				"PUSH {R4-R11}\n"
+				"SUB SP, SP, #0x10\n"
+				"STR R1, [SP, #0x08]\n"
+				"LDR R1, =0\n"
+				"STR R1, [SP, #0x04]\n"
+				"LDR R1, =0\n"
+				"STR R1, [SP, #0x00]\n"
+				"LDR R3, =0\n"
+				"LDR R1, =80\n"
+				"BL " QU(AMBE_DECODE)
+				"ADD SP, SP, #0x10\n"
+				"POP {R4-R11}"
+				:
+				: "r"(r0), "r"(r1), "r"(r2)
+				: "r3", "memory", "cc"
+			);
+		}
 
 		soundStoreBuffer();
 
 		soundSetupBuffer();// this just sets currentWaveBuffer but the compiler seems to optimise out the code if I try to do it in this file
-		r2 = (int)bitbuffer_decode;
-		r0 = (int)currentWaveBuffer;
-		r1 = (int)ambebuffer_decode;
+		{
+			register int r0 asm ("r0") = (int)currentWaveBuffer;
+			register int r1 asm ("r1") = (int)ambebuffer_decode;
+			register int r2 asm ("r2") = (int)bitbuffer_decode;
 
-		asm volatile (
-			"PUSH {R4-R11}\n"
-			"SUB SP, SP, #0x10\n"
-			"STR R1, [SP, #0x08]\n"
-			"LDR R1, =1\n"
-			"STR R1, [SP, #0x04]\n"
-			"LDR R1, =0\n"
-			"STR R1, [SP, #0x00]\n"
-			"LDR R3, =0\n"
-			"LDR R1, =80\n"
-			"BL " QU(AMBE_DECODE)
-			"ADD SP, SP, #0x10\n"
-			"POP {R4-R11}"
-		);
+			asm volatile (
+				"PUSH {R4-R11}\n"
+				"SUB SP, SP, #0x10\n"
+				"STR R1, [SP, #0x08]\n"
+				"LDR R1, =1\n"
+				"STR R1, [SP, #0x04]\n"
+				"LDR R1, =0\n"
+				"STR R1, [SP, #0x00]\n"
+				"LDR R3, =0\n"
+				"LDR R1, =80\n"
+				"BL " QU(AMBE_DECODE)
+				"ADD SP, SP, #0x10\n"
+				"POP {R4-R11}"
+				:
+				: "r"(r0), "r"(r1), "r"(r2)
+				: "r3", "memory", "cc"
+			);
+		}
 
 		soundStoreBuffer();
     }
@@ -94,73 +102,84 @@ void codecDecode(uint8_t *indata_ptr, int numbBlocks)
 
 void codecEncodeBlock(uint8_t *outdata_ptr)
 {
-	register int r0 asm ("r0") __attribute__((unused));
-	register int r1 asm ("r1") __attribute__((unused));
-	register int r2 asm ("r2") __attribute__((unused));
-
 	memset((uint8_t *)outdata_ptr, 0, 9);// fills with zeros
 	memset(bitbuffer_encode, 0, sizeof(bitbuffer_encode));// faster to call memset as it will be compiled as optimised code
 
 
 	soundRetrieveBuffer();// gets currentWaveBuffer pointer used as input r2 to the encoder
 
-	r0 = (int)bitbuffer_encode;
-	r2 = (int)currentWaveBuffer;//tmp_wavbuffer;
-	r1 = (int)ambebuffer_encode;// seems to be a hard coded (defined) memory address of 0x1FFF6B60. I'm not sure why it has to be hard coded, since its passed as a paramater (register)
+	{
+		register int r0 asm ("r0") = (int)bitbuffer_encode;
+		register int r1 asm ("r1") = (int)ambebuffer_encode;
+		register int r2 asm ("r2") = (int)currentWaveBuffer;
 
-	asm volatile (
-		"PUSH {R4-R11}\n"
-		"SUB SP, SP, #0x14\n"
-		"STR R1, [SP, #0x0C]\n"
-		"LDR R1, =0x00002000\n"
-		"STR R1, [SP, #0x08]\n"
-		"LDR R1, =0\n"
-		"STR R1, [SP, #0x04]\n"
-		"LDR R1, =0x00001840\n"
-		"STR R1, [SP, #0x00]\n"
-		"LDR R3, =80\n"
-		"LDR R1, =0\n"
-		"BL " QU(AMBE_ENCODE)
-		"ADD SP, SP, #0x14\n"
-		"POP {R4-R11}"
-	);
+		asm volatile (
+			"PUSH {R4-R11}\n"
+			"SUB SP, SP, #0x14\n"
+			"STR R1, [SP, #0x0C]\n"
+			"LDR R1, =0x00002000\n"
+			"STR R1, [SP, #0x08]\n"
+			"LDR R1, =0\n"
+			"STR R1, [SP, #0x04]\n"
+			"LDR R1, =0x00001840\n"
+			"STR R1, [SP, #0x00]\n"
+			"LDR R3, =80\n"
+			"LDR R1, =0\n"
+			"BL " QU(AMBE_ENCODE)
+			"ADD SP, SP, #0x14\n"
+			"POP {R4-R11}"
+			: "+r"(r0), "+r"(r1), "+r"(r2)
+			:
+			: "r3", "memory", "cc"
+		);
+	}
 
 	soundRetrieveBuffer();// gets currentWaveBuffer pointer used as input r2 to the encoder
 
-	r0 = (int)bitbuffer_encode;
-	r2 = (int)currentWaveBuffer;//tmp_wavbuffer;
-	r1 = (int)ambebuffer_encode;
+	{
+		register int r0 asm ("r0") = (int)bitbuffer_encode;
+		register int r1 asm ("r1") = (int)ambebuffer_encode;
+		register int r2 asm ("r2") = (int)currentWaveBuffer;
 
-	asm volatile (
-		"PUSH {R4-R11}\n"
-		"SUB SP, SP, #0x14\n"
-		"STR R1, [SP, #0x0C]\n"
-		"LDR R1, =0x00002000\n"
-		"STR R1, [SP, #0x08]\n"
-		"LDR R1, =1\n"
-		"STR R1, [SP, #0x04]\n"
-		"LDR R1, =0x00000800\n"
-		"STR R1, [SP, #0x00]\n"
-		"LDR R3, =80\n"
-		"LDR R1, =0\n"
-		"BL " QU(AMBE_ENCODE)
-		"ADD SP, SP, #0x14\n"
-		"POP {R4-R11}"
-	);
+		asm volatile (
+			"PUSH {R4-R11}\n"
+			"SUB SP, SP, #0x14\n"
+			"STR R1, [SP, #0x0C]\n"
+			"LDR R1, =0x00002000\n"
+			"STR R1, [SP, #0x08]\n"
+			"LDR R1, =1\n"
+			"STR R1, [SP, #0x04]\n"
+			"LDR R1, =0x00000800\n"
+			"STR R1, [SP, #0x00]\n"
+			"LDR R3, =80\n"
+			"LDR R1, =0\n"
+			"BL " QU(AMBE_ENCODE)
+			"ADD SP, SP, #0x14\n"
+			"POP {R4-R11}"
+			: "+r"(r0), "+r"(r1), "+r"(r2)
+			:
+			: "r3", "memory", "cc"
+		);
+	}
 
-	r0 = (int)bitbuffer_encode;
-	r1 = (int)ambebuffer_encode_ecc;
+	{
+		register int r0 asm ("r0") = (int)bitbuffer_encode;
+		register int r1 asm ("r1") = (int)ambebuffer_encode_ecc;
 
-	asm volatile (
-		"PUSH {R4-R11}\n"
-		"SUB SP, SP, #0x14\n"
-		"MOV R3, R1\n"
-		"LDR R2, =0\n"
-		"MOV R1, R0\n"
-		"BL " QU(AMBE_ENCODE_ECC)
-		"ADD SP, SP, #0x14\n"
-		"POP {R4-R11}"
-	);
+		asm volatile (
+			"PUSH {R4-R11}\n"
+			"SUB SP, SP, #0x14\n"
+			"MOV R3, R1\n"
+			"LDR R2, =0\n"
+			"MOV R1, R0\n"
+			"BL " QU(AMBE_ENCODE_ECC)
+			"ADD SP, SP, #0x14\n"
+			"POP {R4-R11}"
+			: "+r"(r0), "+r"(r1)
+			:
+			: "r2", "r3", "memory", "cc"
+		);
+	}
 
 	for (int i = 0; i < 72; i++)
 	{
