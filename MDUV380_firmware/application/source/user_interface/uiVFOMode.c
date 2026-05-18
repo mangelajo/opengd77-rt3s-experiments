@@ -649,6 +649,22 @@ void uiVFOModeUpdateScreen(int txTimeSecs)
 								false, (selectedFreq == VFO_SELECTED_FREQUENCY_INPUT_RX),
 								(uiDataGlobal.reverseRepeaterVFO ? currentChannelData->txFreq : currentChannelData->rxFreq), true,
 								(screenOperationMode[nonVolatileSettings.currentVFONumber] == VFO_SCREEN_OPERATION_SCAN), 0);
+
+#if defined(VFO_SWEEP_WATERFALL)
+						if (screenOperationMode[nonVolatileSettings.currentVFONumber] == VFO_SCREEN_OPERATION_SWEEP)
+						{
+							// Sweep span edges, in a small font just below the graph.
+							int sweepRange = VFO_SWEEP_SCAN_RANGE_SAMPLE_STEP_TABLE[uiDataGlobal.Scan.sweepStepSizeIndex];
+							int sweepStartFreq = currentChannelData->rxFreq + ((sweepRange * (0 - (VFO_SWEEP_NUM_SAMPLES / 2))) / VFO_SWEEP_PIXELS_PER_STEP);
+							int sweepEndFreq = currentChannelData->rxFreq + ((sweepRange * ((VFO_SWEEP_NUM_SAMPLES - 1) - (VFO_SWEEP_NUM_SAMPLES / 2))) / VFO_SWEEP_PIXELS_PER_STEP);
+
+							snprintf(buffer, SCREEN_LINE_BUFFER_SIZE, "%u.%03u", (sweepStartFreq / 100000), ((sweepStartFreq % 100000) / 100));
+							displayPrintCore(2, VFO_SWEEP_GRAPH_START_Y + VFO_SWEEP_GRAPH_HEIGHT_Y, buffer, FONT_SIZE_1, TEXT_ALIGN_LEFT, false);
+
+							snprintf(buffer, SCREEN_LINE_BUFFER_SIZE, "%u.%03u", (sweepEndFreq / 100000), ((sweepEndFreq % 100000) / 100));
+							displayPrintCore(2, VFO_SWEEP_GRAPH_START_Y + VFO_SWEEP_GRAPH_HEIGHT_Y, buffer, FONT_SIZE_1, TEXT_ALIGN_RIGHT, false);
+						}
+#endif
 					}
 					else
 					{
@@ -2339,13 +2355,24 @@ static void vfoSweepDrawSample(int offset)
 #if defined(VFO_SWEEP_WATERFALL)
 	int rssi = MAX(vfoSweepSamples[offset] - vfoSweepRssiNoiseFloor, 0);
 
-	// Band-scope bar in the top quarter of the graph region.
+	// Band-scope bar in the top third of the graph region.
 	int16_t barHeight = MIN(VFO_SWEEP_BARS_HEIGHT, (rssi * VFO_SWEEP_BARS_HEIGHT) / vfoSweepGain);
 
 	displayThemeApply(THEME_ITEM_FG_RSSI_BAR, THEME_ITEM_BG);
 	displayDrawFastVLine(offset, VFO_SWEEP_GRAPH_START_Y, (VFO_SWEEP_BARS_HEIGHT - barHeight), false); // Clear
 	displayDrawFastVLine(offset, ((VFO_SWEEP_GRAPH_START_Y + VFO_SWEEP_BARS_HEIGHT) - barHeight), barHeight, true); // Level
 	displayThemeResetToDefault();
+
+	// Centre-frequency marker: a dotted line down the band-scope bars.
+	if (offset == (DISPLAY_SIZE_X >> 1))
+	{
+		displayThemeApply(THEME_ITEM_FG_DECORATION, THEME_ITEM_BG);
+		for (int16_t y = VFO_SWEEP_GRAPH_START_Y; y < (VFO_SWEEP_GRAPH_START_Y + VFO_SWEEP_BARS_HEIGHT); y += 2)
+		{
+			displaySetPixel(offset, y, true);
+		}
+		displayThemeResetToDefault();
+	}
 
 	// Waterfall: one frequency bin -> one colour pixel on the top waterfall row.
 	int level = MIN(31, (rssi * 31) / vfoSweepGain);
