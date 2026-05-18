@@ -116,4 +116,34 @@ $(BUILD_DIR)/%.o: %.S
 clean:
 	rm -rf $(BUILD_DIR)
 
+# --- flash targets ----------------------------------------------------------
+# Run these from the HOST (not via the podman build wrapper) — flashing needs
+# direct USB access.  Put the radio in DFU mode first (power off, hold SK1,
+# power on).
+#
+# Defaults assume the surrounding OpenGD77/ layout this fork was set up with;
+# override on the command line, e.g.:
+#     make flash LOADER=/path/to/opengd77_stm32_firmware_loader.py
+#
+# NOTE: this Makefile builds the firmware with -DPLATFORM_MDUV380.  The flash-*
+# targets below only switch the upload cipher; running this binary on a
+# non-MDUV380 radio family is unlikely to boot without rebuilding with the
+# matching PLATFORM_* define.
+LOADER       ?= ../../../tools/mduv380_tools/opengd77_stm32_firmware_loader.py
+PYTHON       ?= ../../../.venv/bin/python
+FIRMWARE_BIN := $(BUILD_DIR)/OpenMDUV380.bin
+
+.PHONY: flash flash-mduv380 flash-md2017 flash-dm1701 flash-md380
+
+flash: flash-mduv380
+
+flash-mduv380 flash-md2017 flash-dm1701 flash-md380:
+	@test -f $(FIRMWARE_BIN) || { echo "ERROR: $(FIRMWARE_BIN) missing — run build.sh first." >&2; exit 1; }
+	$(PYTHON) $(LOADER) -m $(PLATFORM) -f $(FIRMWARE_BIN)
+
+flash-mduv380: PLATFORM := MD-UV380
+flash-md2017:  PLATFORM := MD-2017
+flash-dm1701:  PLATFORM := DM-1701
+flash-md380:   PLATFORM := MD-380
+
 -include $(DEPS)
