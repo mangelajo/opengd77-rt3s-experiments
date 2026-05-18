@@ -37,6 +37,11 @@
 #include "user_interface/uiLocalisation.h"
 #include "utils.h"
 
+// Colour-display platforms render the sweep as a band-scope + scrolling waterfall.
+#if defined(PLATFORM_MD380) || defined(PLATFORM_MDUV380) || defined(PLATFORM_RT84_DM1701) || defined(PLATFORM_MD2017)
+#define VFO_SWEEP_WATERFALL
+#endif
+
 typedef enum
 {
 	VFO_SELECTED_FREQUENCY_INPUT_RX,
@@ -76,6 +81,9 @@ static void handleDownKey(uiEvent_t *ev);
 static void vfoSweepUpdateSamples(int offset, bool forceRedraw, int bandwidthRescale);
 static void setSweepIncDecSetting(sweepSetting_t type, bool increment);
 static void vfoSweepDrawSample(int offset);
+#if defined(VFO_SWEEP_WATERFALL)
+static void vfoSweepWaterfallClear(void);
+#endif
 static void clearNuisance(void);
 
 static vfoSelectedFrequencyInput_t selectedFreq = VFO_SELECTED_FREQUENCY_INPUT_RX;
@@ -106,9 +114,11 @@ static const int VFO_SWEEP_STEP_TIME  = 25;// 25ms
 #define VFO_SWEEP_GRAPH_HEIGHT_Y   38
 #endif
 
-// Colour-display platforms render the sweep as a scrolling waterfall.
-#if defined(PLATFORM_MD380) || defined(PLATFORM_MDUV380) || defined(PLATFORM_RT84_DM1701) || defined(PLATFORM_MD2017)
-#define VFO_SWEEP_WATERFALL
+#if defined(VFO_SWEEP_WATERFALL)
+// The band-scope bars keep the top quarter of the graph; the waterfall fills the rest.
+#define VFO_SWEEP_BARS_HEIGHT			(VFO_SWEEP_GRAPH_HEIGHT_Y / 4)
+#define VFO_SWEEP_WATERFALL_START_Y		(VFO_SWEEP_GRAPH_START_Y + VFO_SWEEP_BARS_HEIGHT)
+#define VFO_SWEEP_WATERFALL_HEIGHT		(VFO_SWEEP_GRAPH_HEIGHT_Y - VFO_SWEEP_BARS_HEIGHT)
 #endif
 
 
@@ -151,7 +161,10 @@ menuStatus_t uiVFOMode(uiEvent_t *ev, bool isFirstRun)
 					vfoSweepDrawSample(i);
 				}
 
-#if !defined(VFO_SWEEP_WATERFALL)
+#if defined(VFO_SWEEP_WATERFALL)
+				// The lock screen overwrote the waterfall history; start it empty again.
+				vfoSweepWaterfallClear();
+#else
 				displayDrawFastVLine((uiDataGlobal.Scan.sweepSampleIndex) % VFO_SWEEP_NUM_SAMPLES, VFO_SWEEP_GRAPH_START_Y, VFO_SWEEP_GRAPH_HEIGHT_Y, true);// draw solid line in the next location
 				displayDrawFastVLine((uiDataGlobal.Scan.sweepSampleIndex + uiDataGlobal.Scan.sweepSampleIndexIncrement) % VFO_SWEEP_NUM_SAMPLES, VFO_SWEEP_GRAPH_START_Y, VFO_SWEEP_GRAPH_HEIGHT_Y, true);// draw solid line in the next location
 #endif
@@ -2247,26 +2260,72 @@ static void vfoSweepBuildWaterfallPalette(void)
 	vfoSweepWaterfallMarkerColour = displayConvertRGB888ToNative(0xFFFFFF);
 }
 
-// Scroll the waterfall region down one pixel so the freshest sweep stays on top.
+// Scroll the waterfall history down one pixel so the freshest sweep stays on top.
 static void vfoSweepWaterfallScroll(void)
 {
 	uint16_t *fb = displayGetScreenBuffer();
 
-	for (int y = (VFO_SWEEP_GRAPH_START_Y + VFO_SWEEP_GRAPH_HEIGHT_Y - 1); y > VFO_SWEEP_GRAPH_START_Y; y--)
+	for (int y = (VFO_SWEEP_WATERFALL_START_Y + VFO_SWEEP_WATERFALL_HEIGHT - 1); y > VFO_SWEEP_WATERFALL_START_Y; y--)
 	{
 		memmove(&fb[y * DISPLAY_SIZE_X], &fb[(y - 1) * DISPLAY_SIZE_X], DISPLAY_SIZE_X * sizeof(uint16_t));
 	}
+}
+
+// Slide the whole waterfall history sideways to follow a retune, blanking the
+// columns whose frequencies have not been swept yet (mirrors the sample buffer).
+static void vfoSweepWaterfallShift(int pixels)
+{
+	uint16_t *fb = displayGetScreenBuffer();
+	int n = ((pixels < 0) ? -pixels : pixels);
+
+	if (n > DISPLAY_SIZE_X)
+	{
+		n = DISPLAY_SIZE_X;
+	}
+
+	for (int y = VFO_SWEEP_WATERFALL_START_Y; y < (VFO_SWEEP_WATERFALL_START_Y + VFO_SWEEP_WATERFALL_HEIGHT); y++)
+	{
+		uint16_t *row = &fb[y * DISPLAY_SIZE_X];
+
+		if (pixels > 0)
+		{
+			memmove(&row[0], &row[n], (DISPLAY_SIZE_X - n) * sizeof(uint16_t));
+			memset(&row[DISPLAY_SIZE_X - n], 0x00, n * sizeof(uint16_t));
+		}
+		else
+		{
+			memmove(&row[n], &row[0], (DISPLAY_SIZE_X - n) * sizeof(uint16_t));
+			memset(&row[0], 0x00, n * sizeof(uint16_t));
+		}
+	}
+}
+
+// Blank the waterfall history (on sweep entry, and on zoom where the old rows
+// no longer share the frequency scale).
+static void vfoSweepWaterfallClear(void)
+{
+	memset(&displayGetScreenBuffer()[VFO_SWEEP_WATERFALL_START_Y * DISPLAY_SIZE_X], 0x00,
+			VFO_SWEEP_WATERFALL_HEIGHT * DISPLAY_SIZE_X * sizeof(uint16_t));
 }
 #endif
 
 static void vfoSweepDrawSample(int offset)
 {
 #if defined(VFO_SWEEP_WATERFALL)
-	// One frequency bin -> one colour pixel on the top waterfall row.
-	int level = MAX(vfoSweepSamples[offset] - vfoSweepRssiNoiseFloor, 0);
-	level = MIN(31, (level * 31) / vfoSweepGain);
+	int rssi = MAX(vfoSweepSamples[offset] - vfoSweepRssiNoiseFloor, 0);
 
-	displayGetScreenBuffer()[(VFO_SWEEP_GRAPH_START_Y * DISPLAY_SIZE_X) + offset] =
+	// Band-scope bar in the top quarter of the graph region.
+	int16_t barHeight = MIN(VFO_SWEEP_BARS_HEIGHT, (rssi * VFO_SWEEP_BARS_HEIGHT) / vfoSweepGain);
+
+	displayThemeApply(THEME_ITEM_FG_RSSI_BAR, THEME_ITEM_BG);
+	displayDrawFastVLine(offset, VFO_SWEEP_GRAPH_START_Y, (VFO_SWEEP_BARS_HEIGHT - barHeight), false); // Clear
+	displayDrawFastVLine(offset, ((VFO_SWEEP_GRAPH_START_Y + VFO_SWEEP_BARS_HEIGHT) - barHeight), barHeight, true); // Level
+	displayThemeResetToDefault();
+
+	// Waterfall: one frequency bin -> one colour pixel on the top waterfall row.
+	int level = MIN(31, (rssi * 31) / vfoSweepGain);
+
+	displayGetScreenBuffer()[(VFO_SWEEP_WATERFALL_START_Y * DISPLAY_SIZE_X) + offset] =
 			((offset == (DISPLAY_SIZE_X >> 1)) ? vfoSweepWaterfallMarkerColour : vfoSweepWaterfallPalette[level]);
 #else
 	int16_t graphHeight = MAX(vfoSweepSamples[offset] - vfoSweepRssiNoiseFloor, 0);
@@ -2306,6 +2365,10 @@ static void vfoSweepUpdateSamples(int offset, bool forceRedraw, int bandwidthRes
 
 	if (offset != 0)
 	{
+#if defined(VFO_SWEEP_WATERFALL)
+		// Scroll the waterfall history sideways with the band scope, rather than resetting it.
+		vfoSweepWaterfallShift(offset);
+#endif
 		if (offset > 0)
 		{
 			uiDataGlobal.Scan.sweepSampleIndex = VFO_SWEEP_NUM_SAMPLES - 1 - offset;
@@ -2323,6 +2386,10 @@ static void vfoSweepUpdateSamples(int offset, bool forceRedraw, int bandwidthRes
 
 	if (bandwidthRescale != 0)
 	{
+#if defined(VFO_SWEEP_WATERFALL)
+		// A zoom changes the Hz-per-pixel scale, so the old history no longer lines up.
+		vfoSweepWaterfallClear();
+#endif
 		uint8_t tmp[VFO_SWEEP_NUM_SAMPLES];
 		memset(tmp, 0x00, VFO_SWEEP_NUM_SAMPLES);
 		int newStartSample = (VFO_SWEEP_NUM_SAMPLES / 2) - (VFO_SWEEP_NUM_SAMPLES / 4);
@@ -3525,9 +3592,8 @@ static void sweepScanInit(void)
 	vfoSweepUpdateSamples(0, true, 0);
 
 #if defined(VFO_SWEEP_WATERFALL)
-	// Start from a cleared region so no stale pixels show before the waterfall fills.
-	memset(&displayGetScreenBuffer()[VFO_SWEEP_GRAPH_START_Y * DISPLAY_SIZE_X], 0x00,
-			VFO_SWEEP_GRAPH_HEIGHT_Y * DISPLAY_SIZE_X * sizeof(uint16_t));
+	// The band-scope bars were just drawn; start the waterfall history empty.
+	vfoSweepWaterfallClear();
 	displayRenderRows(1, ((8 + VFO_SWEEP_GRAPH_HEIGHT_Y) / 8) + 1);
 #endif
 
