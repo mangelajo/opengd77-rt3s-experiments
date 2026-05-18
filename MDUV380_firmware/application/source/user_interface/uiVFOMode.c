@@ -80,6 +80,7 @@ static void handleUpKey(uiEvent_t *ev);
 static void handleDownKey(uiEvent_t *ev);
 static void vfoSweepUpdateSamples(int offset, bool forceRedraw, int bandwidthRescale);
 static void setSweepIncDecSetting(sweepSetting_t type, bool increment);
+static void vfoSweepChangeResolution(bool finer);
 static void vfoSweepDrawSample(int offset);
 #if defined(VFO_SWEEP_WATERFALL)
 static void vfoSweepWaterfallClear(void);
@@ -115,8 +116,8 @@ static const int VFO_SWEEP_STEP_TIME  = 25;// 25ms
 #endif
 
 #if defined(VFO_SWEEP_WATERFALL)
-// The band-scope bars keep the top quarter of the graph; the waterfall fills the rest.
-#define VFO_SWEEP_BARS_HEIGHT			(VFO_SWEEP_GRAPH_HEIGHT_Y / 4)
+// The band-scope bars keep the top third of the graph; the waterfall fills the rest.
+#define VFO_SWEEP_BARS_HEIGHT			(VFO_SWEEP_GRAPH_HEIGHT_Y / 3)
 #define VFO_SWEEP_WATERFALL_START_Y		(VFO_SWEEP_GRAPH_START_Y + VFO_SWEEP_BARS_HEIGHT)
 #define VFO_SWEEP_WATERFALL_HEIGHT		(VFO_SWEEP_GRAPH_HEIGHT_Y - VFO_SWEEP_BARS_HEIGHT)
 #endif
@@ -1751,12 +1752,7 @@ static void handleEvent(uiEvent_t *ev)
 				{
 					if (BUTTONCHECK_DOWN(ev, BUTTON_SK1))
 					{
-						// SK1 + Right: finer sweep resolution
-						if (vfoSweepResolution > 1)
-						{
-							vfoSweepResolution /= 2;
-							uiDataGlobal.Scan.sweepSampleIndex = 0;
-						}
+						vfoSweepChangeResolution(true); // SK1 + Right: finer
 						return;
 					}
 
@@ -1865,12 +1861,7 @@ static void handleEvent(uiEvent_t *ev)
 				{
 					if (BUTTONCHECK_DOWN(ev, BUTTON_SK1))
 					{
-						// SK1 + Left: coarser sweep resolution
-						if (vfoSweepResolution < 8)
-						{
-							vfoSweepResolution *= 2;
-							uiDataGlobal.Scan.sweepSampleIndex = 0;
-						}
+						vfoSweepChangeResolution(false); // SK1 + Left: coarser
 						return;
 					}
 
@@ -2565,6 +2556,32 @@ static void setSweepIncDecSetting(sweepSetting_t type, bool increment)
 	{
 		vfoSweepUpdateSamples(0, true, bandwidthRescaleDirection);
 	}
+}
+
+// SK1 + Left/Right adjust the sweep resolution (pixels per measurement) and
+// flash the new value, since it has no permanent spot on the sweep screen.
+static void vfoSweepChangeResolution(bool finer)
+{
+	if (finer)
+	{
+		if (vfoSweepResolution > 1)
+		{
+			vfoSweepResolution /= 2;
+		}
+	}
+	else
+	{
+		if (vfoSweepResolution < 8)
+		{
+			vfoSweepResolution *= 2;
+		}
+	}
+
+	uiDataGlobal.Scan.sweepSampleIndex = 0; // restart so the pixel groups stay aligned
+
+	char buf[SCREEN_LINE_BUFFER_SIZE];
+	snprintf(buf, SCREEN_LINE_BUFFER_SIZE, "Res /%d", vfoSweepResolution);
+	uiNotificationShow(NOTIFICATION_TYPE_MESSAGE, NOTIFICATION_ID_MESSAGE, 1000, buf, true);
 }
 
 static void stepFrequency(int increment)
