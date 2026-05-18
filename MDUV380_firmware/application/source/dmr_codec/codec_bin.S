@@ -25,5 +25,5 @@
  *
  */
 
-.section .codec_bin_section_1
+.section .codec_bin_section_1, "a", %progbits
 .incbin "../application/source/linkerdata/codec_bin_section_1.bin"
