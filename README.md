@@ -1,100 +1,89 @@
-# OpenGD77
-Firmware for DMR transceivers using the STM32F405VGT MCU, AT1846S RF chip and HR-C6000 DMR chipset.  
-Including the Radioddiy TYT MD-380UV / Retevis RT-3S and Baofeng DM-1701 / Retevis RT-84
+# opengd77-rt3s-experiments
 
-# Project status
+**Unofficial source mirror and experimental fork** of the
+[OpenGD77](https://www.opengd77.com/) firmware for the **MDUV380 / DM1701**
+radio family (Retevis RT3S with GPS, TYT MD-UV380, Baofeng DM-1701,
+Retevis RT-84, MD-380UV).
 
-The firmware is relatively stable and provides DMR and FM audio transmission and reception, as well as a DMR hotspot mode.  
-However it does not support some core functionality that the official firmware supports, including sending and receiving of text / SMS messages
+This repository is **not affiliated with the OpenGD77 project**. It is a
+personal working copy maintained by [EA4IPW](https://www.qrz.com/db/EA4IPW)
+for tracking local modifications and experiments (waterfall band-scope
+display, build-environment tooling, etc.).
 
-The firmware source code does not contain a AMBE codec required for DMR operation.  
-This functionality is provided by the official firmware which is merged with the OpenGD77 by the OpenGD77CPS or firmware loader
+## What's here
 
+| Path | Contents | Origin |
+|---|---|---|
+| `MDUV380_firmware/` | OpenGD77 R20260131 source release, verbatim | upstream |
+| `MDUV380_firmware/Makefile` | Reconstructed from `.cproject` for command-line builds outside STM32CubeIDE | local addition |
 
-# User guide
+The build wrapper scripts (Containerfile, `build.sh`) that drive a
+[podman](https://podman.io/)-based Ubuntu container build live **outside this
+repository** in the maintainer's working directory.
 
-See https://github.com/LibreDMR/OpenGD77_UserGuide
+## License — **non-commercial only**
 
+The OpenGD77 source code is distributed under a **modified BSD-3-Clause
+license with an explicit non-commercial restriction** (see
+[`license.txt`](license.txt) and
+[`MDUV380_firmware/tools/license.txt`](MDUV380_firmware/tools/license.txt)).
+Relevant clause:
 
-# Credits
-Originally conceived by Kai DG4KLU.  
-Further development by Roger VK3KYY, latterly assisted by Daniel F1RMB, Alex DL4LEX, Colin G4EML and others.
+> 4. Use of this source code or binary releases for commercial purposes is
+> strictly forbidden. This includes, without limitation, incorporation in a
+> commercial product or incorporation into a product or project which allows
+> commercial use.
 
-Current lead developer and source code gatekeeper is Roger VK3KYY
+This restriction inherits to any fork or derivative work, including this one.
 
+Bundled third-party components retain their own licenses:
 
-# Copyright
+- **CMSIS** — Apache-2.0
+- **STM32F4xx HAL Driver** — BSD-3-Clause
+- **ST USB Device Library** — ST SLA0044
+- **FreeRTOS** — MIT (Amazon)
+- **SEGGER RTT** — SEGGER custom BSD-like
 
- The firmware is copyright of the OpenGD77 developers. See individual source files for copyright information.
+See the `LICENSE`/`LICENSE.txt` files inside each subdirectory.
 
-## MCU SDK and API code:   
-   See license files in sub-folders
-	
-## FreeRTOS
-   Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  
-   All Rights Reserved.
+## Upstream and credits
 
+- Upstream release zips: <https://www.opengd77.com/downloads/releases/>
+- Community-maintained user guide:
+  <https://github.com/LibreDMR/OpenGD77_UserGuide>
+- Original authors and contributors are listed in
+  the upstream README ([`UPSTREAM_README.md`](UPSTREAM_README.md))
+  (Kai DG4KLU, Roger VK3KYY, Daniel F1RMB, Alex DL4LEX, Colin G4EML and
+  many others).
 
-# License
+If you are looking for the canonical firmware: **use
+[opengd77.com](https://www.opengd77.com/)**, not this repo.
 
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions
-are met:
+## Building
 
-1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+The firmware was historically built with STM32CubeIDE on Linux/Windows.
+The added `Makefile` lets you build with a stock `arm-none-eabi-gcc` outside
+the IDE.
 
-2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer
-   in the documentation and/or other materials provided with the distribution.
+```sh
+# inside an Ubuntu / Debian environment with the ARM toolchain installed
+cd MDUV380_firmware
+make            # produces build/OpenMDUV380.bin
+```
 
-3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived
-   from this software without specific prior written permission.
+On macOS, the build is driven through a podman container (the codec_cleaner
+helper is x86_64 Linux-only) — those scripts are not in this repo.
 
-4. Use of this source code or binary releases for commercial purposes is strictly forbidden. This includes, without limitation,
-   incorporation in a commercial product or incorporation into a product or project which allows commercial use.
+> ⚠️ The build relies on the AMBE codec being patched in at **flash time**
+> from a separate "donor" firmware. This repository contains zero AMBE
+> code or data. See the OpenGD77 docs for the codec/flashing workflow.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
-USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+## Local experiments
 
+Branches under `feature/*` may contain in-progress experiments (for
+example, converting the existing VFO sweep mode in
+`MDUV380_firmware/application/source/user_interface/uiVFOMode.c` into a
+proper scrolling waterfall display). These are not endorsed by upstream
+and may be broken at any commit.
 
-# Special thanks
-
-Thanks to those who have assisted the project including :
-
-BD4VOW
-CT1HSN
-CT4TX 
-DG3GSP
-DG4KLU
-DJ0HF
-DL4LEX
-EA3BIL
-EA3IGM
-EA5SW
-EB3AM
-EW1ADG
-F1CXG
-F1RMB
-G4ELM
-IK0NWG
-IU4LEG
-IZ2EIB
-JE4SMQ
-JG1UAA
-OH1E
-OK2HAD
-ON1HK
-ON7LDS
-OZ1MAX
-PU4RON
-SQ6SFO
-SQ7PTE
-TA5AYX
-VK3KYY
-VK4JWT
-VK7JS
-VK7ZCR
-VK7ZJA
-ZL1XE
+— 73, EA4IPW
