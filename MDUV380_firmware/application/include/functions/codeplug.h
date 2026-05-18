@@ -393,6 +393,7 @@ uint32_t codeplugChannelGetOptionalDMRID(CodeplugChannel_t *channelBuf);
 void codeplugChannelSetOptionalDMRID(CodeplugChannel_t *channelBuf, uint32_t dmrID);
 uint8_t codeplugChannelGetFlag(CodeplugChannel_t *channelBuf, ChannelFlag_t flag);
 uint8_t codeplugChannelSetFlag(CodeplugChannel_t *channelBuf, ChannelFlag_t flag, uint8_t value);
+bool codeplugChannelLocationIsValid(CodeplugChannel_t *channelBuf);
 void codeplugChannelGetDataWithOffsetAndLengthForIndex(int index, CodeplugChannel_t *channelBuf, uint8_t offset, int length);
 void codeplugChannelGetDataForIndex(int index, CodeplugChannel_t *channelBuf);
 void codeplugUtilConvertBufToString(char *codeplugBuf, char *outBuf, int len);

@@ -582,6 +582,17 @@ uint8_t codeplugChannelSetFlag(CodeplugChannel_t *channelBuf, ChannelFlag_t flag
 
 	return value;
 }
+
+//
+// Returns true when the channel has a non-zero location (both latitude and longitude set)
+//
+bool codeplugChannelLocationIsValid(CodeplugChannel_t *channelBuf)
+{
+	uint32_t lat = (channelBuf->locationLat2 << 16) | (channelBuf->locationLat1 << 8) | channelBuf->locationLat0;
+	uint32_t lon = (channelBuf->locationLon2 << 16) | (channelBuf->locationLon1 << 8) | channelBuf->locationLon0;
+
+	return ((lat != 0) && (lon != 0));
+}
 // ----------------------------------------
 // -- END: Codeplug channel flag helpers --
 // ----------------------------------------

@@ -126,7 +126,7 @@ static menuStatus_t menuQuickChannelExitStatus = MENU_STATUS_SUCCESS;
 
 static void checkChannelLocation(CodeplugChannel_t *channelData)
 {
-	if (settingsLocationIsValid() && codeplugChannelGetFlag(channelData, CHANNEL_FLAG_USE_LOCATION))
+	if (settingsLocationIsValid())
 	{
 		uint32_t tmp1 = channelData->locationLat2;
 		tmp1 = (tmp1 << 8) + channelData->locationLat1;
@@ -3152,8 +3152,7 @@ static void initSortedChannels(void)
 			checkChannelLocation(&channelData);
 
 			if ((channelData.NOT_IN_CODEPLUG_CALCULATED_DISTANCE_X10 != -1) &&
-					(channelData.NOT_IN_CODEPLUG_CALCULATED_DISTANCE_X10 < 65535) &&
-					codeplugChannelGetFlag(&channelData, CHANNEL_FLAG_USE_LOCATION))
+					(channelData.NOT_IN_CODEPLUG_CALCULATED_DISTANCE_X10 < 65535))
 			{
 				channelDistances[i].distance = channelData.NOT_IN_CODEPLUG_CALCULATED_DISTANCE_X10;
 			}
