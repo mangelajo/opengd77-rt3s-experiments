@@ -1,0 +1,8 @@
+[project]
+name = "opengd77-tools"
+version = "0.1.0"
+description = "OpenGD77 MDUV380 firmware loader and helper tools"
+requires-python = ">=3.10"
+dependencies = [
+    "pyusb>=1.2",
+]
