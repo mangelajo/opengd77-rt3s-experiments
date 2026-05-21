@@ -1370,6 +1370,14 @@ void codeplugInitChannelsPerZone(void)
 	}
 }
 
+bool codeplugCustomDataAreaIsInitialised(void)
+{
+	uint8_t sig[8];
+
+	SPI_Flash_read(FLASH_ADDRESS_OFFSET + 0, sig, sizeof(sig));
+	return (memcmp("OpenGD77", sig, 8) == 0);
+}
+
 static uint32_t codeplugGetOpenGD77CustomDataStartAddressForType(CodeplugCustomDataType_t dataType, codeplugCustomDataBlockHeader_t *blockHeader)
 {
 	const uint32_t MAX_BLOCK_ADDRESS = 0x10000;
