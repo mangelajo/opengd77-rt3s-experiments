@@ -117,27 +117,43 @@ clean:
 	rm -rf $(BUILD_DIR)
 
 # --- containerised build (run from the HOST) --------------------------------
-# The firmware needs the Linux-only codec_cleaner helper, so it is compiled
-# inside a podman container.  "make build" drives that builder; the actual
-# in-container compile is the default "all" target above.  Override BUILDER
-# on the command line if the wrapper lives elsewhere:
-#     make build BUILDER=/path/to/build.sh
-BUILDER ?= ../../../build/build.sh
+# The build needs a Linux ARM toolchain, so "make build" drives a podman
+# container defined by Containerfile in this directory. Override the engine
+# (e.g. docker) or image tag from the command line:
+#     make build CONTAINER_ENGINE=docker
+#
+# Inside the container the in-container "make all" runs the same rules as a
+# native build, so once the image is cached "make build" is a thin wrapper.
+CONTAINER_ENGINE ?= podman
+IMG_TAG          ?= opengd77-mduv380-builder:latest
+JOBS             ?= $(shell sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
+SRC_DIR          := $(abspath $(CURDIR)/..)
 
-.PHONY: build rebuild help
+CONTAINER_RUN = $(CONTAINER_ENGINE) run --rm \
+                -v $(SRC_DIR):/src:Z \
+                -w /src/MDUV380_firmware \
+                $(IMG_TAG)
 
-build:
-	$(BUILDER)
+.PHONY: image build rebuild help
 
-rebuild:
-	$(BUILDER) clean
-	$(BUILDER)
+image:
+	@$(CONTAINER_ENGINE) image inspect $(IMG_TAG) >/dev/null 2>&1 || \
+	    $(CONTAINER_ENGINE) build -f $(CURDIR)/Containerfile -t $(IMG_TAG) $(CURDIR)
+
+build: image
+	$(CONTAINER_RUN) make -j$(JOBS) all
+	@test -f $(BUILD_DIR)/OpenMDUV380.bin && ls -la $(BUILD_DIR)/OpenMDUV380.bin
+	@command -v shasum >/dev/null 2>&1 && shasum -a 256 $(BUILD_DIR)/OpenMDUV380.bin || true
+
+rebuild: image
+	$(CONTAINER_RUN) sh -c 'make clean && make -j$(JOBS) all'
 
 help:
 	@echo 'OpenGD77 MDUV380 firmware -- make targets (run from MDUV380_firmware/):'
 	@echo ''
 	@echo '  make build     Compile the firmware (build/OpenMDUV380.bin) via podman'
 	@echo '  make rebuild   Clean and compile from scratch'
+	@echo '  make image     Build the podman builder image (cached after first run)'
 	@echo '  make flash     Flash the firmware to an MD-UV380 held in DFU mode'
 	@echo '  make flash-md2017 | flash-dm1701 | flash-md380'
 	@echo '                 Flash for another radio family (upload cipher only)'
