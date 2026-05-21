@@ -26,6 +26,7 @@
  *
  */
 #include "functions/settings.h"
+#include "functions/codeplug.h"
 #include "user_interface/menuSystem.h"
 #include "user_interface/uiLocalisation.h"
 #include "user_interface/uiUtilities.h"
@@ -462,7 +463,10 @@ static void handleBrowserEvent(uiEvent_t *ev)
 			// Save user's theme to flash, as a CustomData block
 			if (BUTTONCHECK_DOWN(ev, BUTTON_SK2))
 			{
-				displayThemeSaveToFlash(currentThemeDaytime);
+				bool saved = displayThemeSaveToFlash(currentThemeDaytime);
+
+				uiNotificationShow(NOTIFICATION_TYPE_MESSAGE, NOTIFICATION_ID_MESSAGE, 2000,
+						(saved ? "Theme saved" : "Save failed"), false);
 			}
 
 			displayThemeResetToDefault();
