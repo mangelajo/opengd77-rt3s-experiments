@@ -327,6 +327,7 @@ const stringsTable_t frenchLanguage =
 .text_size				= "Taille texte",//MaxLen: 16 (with ':' + 1 digit)
 .last_talker				= "Der. locut.", // MaxLen: 16 (with ':' + .off or 2 digits value + 's')
 .mute					= "Sourdine", // MaxLen: 16 (with ':' + .on or .off)
+.reset_configuration			= "Réinit. config.", // MaxLen: 16
 };
 /********************************************************************
  *
