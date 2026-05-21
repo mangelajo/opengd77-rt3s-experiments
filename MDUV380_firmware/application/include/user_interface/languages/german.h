@@ -327,6 +327,7 @@ const stringsTable_t germanLanguage =
 .text_size				= "Text Grösse",//MaxLen: 16 (with ':' + 1 digit)
 .last_talker				= "Last talker", // MaxLen: 16 (with ':' + .off or 2 digits value + 's')
 .mute					= "Mute", // MaxLen: 16 (with ':' + .on or .off)
+.reset_configuration			= "Reset Konfig.", // MaxLen: 16
 };
 /********************************************************************
  *

@@ -320,6 +320,7 @@ enum MENU_SCREENS
 #if !defined(PLATFORM_GD77S)
 	MENU_APRS,
 #endif
+	MENU_RESET_CUSTOM_DATA,// Format the OpenGD77 custom-data flash region (themes/boot image/beep/TLE)
 	// *** Add new menus to be accessed using quickkey (ID: 0..31) above this line ***
 	UI_MESSAGE_BOX,
 	UI_HOTSPOT_MODE,
@@ -465,6 +466,7 @@ menuStatus_t menuContactList(uiEvent_t *event, bool isFirstRun);
 menuStatus_t menuContactListSubMenu(uiEvent_t *event, bool isFirstRun);
 menuStatus_t menuContactDetails(uiEvent_t *event, bool isFirstRun);
 menuStatus_t menuLanguage(uiEvent_t *event, bool isFirstRun);
+menuStatus_t menuResetCustomData(uiEvent_t *event, bool isFirstRun);
 menuStatus_t menuPrivateCall(uiEvent_t *event, bool isFirstRun);
 menuStatus_t uiMessageBox(uiEvent_t *event, bool isFirstRun);
 menuStatus_t menuSatelliteScreen(uiEvent_t *ev, bool isFirstRun);

@@ -327,6 +327,7 @@ const stringsTable_t swedishLanguage =
 .text_size				= "Text size",//MaxLen: 16 (with ':' + 1 digit)
 .last_talker				= "Last talker", // MaxLen: 16 (with ':' + .off or 2 digits value + 's')
 .mute					= "Mute", // MaxLen: 16 (with ':' + .on or .off)
+.reset_configuration			= "Nollst. konfig.", // MaxLen: 16
 };
 /********************************************************************
  *

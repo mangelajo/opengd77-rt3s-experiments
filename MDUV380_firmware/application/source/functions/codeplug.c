@@ -1443,6 +1443,32 @@ bool codeplugGetOpenGD77CustomData(CodeplugCustomDataType_t dataType, uint8_t *d
 	return false;
 }
 
+// Format the entire OpenGD77 custom-data region (64 KB / 16 sectors) and lay
+// down a clean header: "OpenGD77" magic at offset 0, the rest of the region
+// erased (0xFF). After this the firmware's block scan finds an EMPTY slot at
+// offset 12 immediately, and any external tool walking the chain will see a
+// completely clean region — no residual blocks past the first sector to trip
+// over (which was the failure mode on radios codeplugged via qdmr or other
+// tools that don't initialise this area).
+//
+// The whole region (themes, boot image, custom beep, satellite TLE) is lost.
+bool codeplugResetOpenGD77CustomDataArea(void)
+{
+	// MAX_BLOCK_ADDRESS in the scan code is 0x10000 → 16 sectors of 4 KB.
+	for (int i = 0; i < 16; i++)
+	{
+		if (!SPI_Flash_eraseSector(FLASH_ADDRESS_OFFSET + (i * 4096)))
+		{
+			return false;
+		}
+	}
+
+	uint8_t firstPage[256];
+	memset(firstPage, 0xFF, sizeof(firstPage));
+	memcpy(firstPage, "OpenGD77", 8);
+	return SPI_Flash_writePage(FLASH_ADDRESS_OFFSET, firstPage);
+}
+
 bool codeplugSetOpenGD77CustomData(CodeplugCustomDataType_t dataType, uint8_t *dataBuf, int len)
 {
 	codeplugCustomDataBlockHeader_t blockHeader;

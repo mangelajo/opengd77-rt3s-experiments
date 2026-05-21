@@ -35,7 +35,7 @@
 #else
 #define LANGUAGE_TAG_MAGIC_NUMBER { 'G', 'D', '7', '7' }, { 'L', 'A', 'N', 'G' } // Never change this tag.
 #endif
-#define LANGUAGE_TAG_VERSION      { 0x00, 0x00, 0x00, 0x05 } // Bump the version each time the language struct is changed
+#define LANGUAGE_TAG_VERSION      { 0x00, 0x00, 0x00, 0x06 } // Bump the version each time the language struct is changed
 
 typedef struct
 {
@@ -335,6 +335,7 @@ typedef struct
    const char text_size[LANGUAGE_TEXTS_LENGTH];
    const char last_talker[LANGUAGE_TEXTS_LENGTH];
    const char mute[LANGUAGE_TEXTS_LENGTH];
+   const char reset_configuration[LANGUAGE_TEXTS_LENGTH];// Options-menu label for the OpenGD77 custom-data area format action
 } stringsTable_t;
 
 #endif // _OPENGD77_UILANGUAGE_H_

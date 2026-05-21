@@ -148,6 +148,7 @@ static menuFunctionData_t menuFunctions[] =
 #if !defined(PLATFORM_GD77S)
 		{ menuAPRSOptions,          NULL, NULL, 0 },
 #endif
+		{ menuResetCustomData,      NULL, NULL, 0 },
 		// *** Add new menus to be accessed using quickkey (ID: 0..31) above this line ***
 		{ uiMessageBox,             NULL, NULL, 0 },
 		{ menuHotspotMode,          NULL, NULL, 0 },
@@ -694,6 +695,7 @@ static const menuItemNewData_t optionsMenuItems[] =
 #if !defined(PLATFORM_GD77S)
 	{ 257, MENU_APRS            },
 #endif
+	{ 280, MENU_RESET_CUSTOM_DATA },// stringOffset 280 = .reset_configuration field (added at end of stringsTable_t)
 };
 
 const menuItemsList_t menuDataOptions =
