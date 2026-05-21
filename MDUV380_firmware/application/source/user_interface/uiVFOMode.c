@@ -130,6 +130,7 @@ static uint8_t vfoSweepResolution = 1;	// pixels per measurement (1,2,4,8); high
 static bool vfoSweepSavedBandwidth;
 #if defined(VFO_SWEEP_WATERFALL)
 static uint16_t vfoSweepWaterfallPalette[32];	// RSSI-to-colour LUT in native pixel format
+static uint16_t vfoSweepBarPalette[32];		// Same gradient at 150% brightness (clamped), used for the band-scope bars
 #endif
 const int VFO_SWEEP_SCAN_FREQ_STEP_TABLE[7] 		= {125,250,500,1000,2500,5000,10000};
 static uint8_t previousVFONumber = 0xFF; // Keep track of the currently loaded channel data
@@ -2291,6 +2292,14 @@ static void vfoSweepBuildWaterfallPalette(void)
 		uint32_t bl = (((a & 0xFF) * (8 - t)) + ((b & 0xFF) * t)) / 8;
 
 		vfoSweepWaterfallPalette[i] = displayConvertRGB888ToNative((r << 16) | (g << 8) | bl);
+
+		// Same colour at 150% brightness (clamped to 0xFF) — used for the
+		// band-scope bars so the bar tip pops a bit hotter than the freshest
+		// waterfall pixel below it while sharing the gradient hue.
+		uint32_t rb  = MIN(255U, (r  * 3) / 2);
+		uint32_t gb  = MIN(255U, (g  * 3) / 2);
+		uint32_t bb  = MIN(255U, (bl * 3) / 2);
+		vfoSweepBarPalette[i] = displayConvertRGB888ToNative((rb << 16) | (gb << 8) | bb);
 	}
 }
 
@@ -2350,13 +2359,22 @@ static void vfoSweepDrawSample(int offset)
 #if defined(VFO_SWEEP_WATERFALL)
 	int rssi = MAX(vfoSweepSamples[offset] - vfoSweepRssiNoiseFloor, 0);
 
-	// Band-scope bar in the top third of the graph region.
+	// Band-scope bar in the top third of the graph region. Tinted with the
+	// same gradient used for the waterfall below (at 150% brightness), so a
+	// strong signal shows red at the bar tip and on the freshest waterfall row.
+	int level = MIN(31, (rssi * 31) / vfoSweepGain);
 	int16_t barHeight = MIN(VFO_SWEEP_BARS_HEIGHT, (rssi * VFO_SWEEP_BARS_HEIGHT) / vfoSweepGain);
 
 	displayThemeApply(THEME_ITEM_FG_RSSI_BAR, THEME_ITEM_BG);
-	displayDrawFastVLine(offset, VFO_SWEEP_GRAPH_START_Y, (VFO_SWEEP_BARS_HEIGHT - barHeight), false); // Clear
-	displayDrawFastVLine(offset, ((VFO_SWEEP_GRAPH_START_Y + VFO_SWEEP_BARS_HEIGHT) - barHeight), barHeight, true); // Level
+	displayDrawFastVLine(offset, VFO_SWEEP_GRAPH_START_Y, (VFO_SWEEP_BARS_HEIGHT - barHeight), false); // Clear above the bar
 	displayThemeResetToDefault();
+
+	uint16_t *fb = displayGetScreenBuffer();
+	uint16_t barColour = vfoSweepBarPalette[level];
+	for (int16_t y = ((VFO_SWEEP_GRAPH_START_Y + VFO_SWEEP_BARS_HEIGHT) - barHeight); y < (VFO_SWEEP_GRAPH_START_Y + VFO_SWEEP_BARS_HEIGHT); y++)
+	{
+		fb[(y * DISPLAY_SIZE_X) + offset] = barColour;
+	}
 
 	// Centre-frequency marker: a dotted line down the middle of the centre bar,
 	// which spans vfoSweepResolution pixels starting at the centre column.
@@ -2371,9 +2389,7 @@ static void vfoSweepDrawSample(int offset)
 	}
 
 	// Waterfall: one frequency bin -> one colour pixel on the top waterfall row.
-	int level = MIN(31, (rssi * 31) / vfoSweepGain);
-
-	displayGetScreenBuffer()[(VFO_SWEEP_WATERFALL_START_Y * DISPLAY_SIZE_X) + offset] = vfoSweepWaterfallPalette[level];
+	fb[(VFO_SWEEP_WATERFALL_START_Y * DISPLAY_SIZE_X) + offset] = vfoSweepWaterfallPalette[level];
 #else
 	int16_t graphHeight = MAX(vfoSweepSamples[offset] - vfoSweepRssiNoiseFloor, 0);
 	graphHeight = (graphHeight * VFO_SWEEP_GRAPH_HEIGHT_Y) / vfoSweepGain;
@@ -3682,6 +3698,7 @@ static void sweepScanInit(void)
 #if defined(VFO_SWEEP_WATERFALL)
 	vfoSweepBuildWaterfallPalette();
 	vfoSweepWaterfallClear();
+	vfoSweepResolution = 8;	// Coarse-and-fast on entry; user can refine with SK1+wheel.
 #endif
 
 	screenOperationMode[nonVolatileSettings.currentVFONumber] = VFO_SCREEN_OPERATION_SWEEP;
