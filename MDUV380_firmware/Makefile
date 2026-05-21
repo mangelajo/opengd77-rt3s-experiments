@@ -78,7 +78,7 @@ all: $(BUILD_DIR)/OpenMDUV380.bin
 
 # Step 1: generate the codec placeholder before compilation
 prepare:
-	@cd application/source/linkerdata && ../../../tools/codec_cleaner.Linux -C
+	@cd application/source/linkerdata && python3 ../../../tools/codec_cleaner.py -C
 
 # Step 2: compile/link
 $(BUILD_DIR)/$(TARGET).elf: prepare $(OBJS) $(LDSCRIPT)
@@ -94,7 +94,7 @@ $(BUILD_DIR)/$(TARGET).bin: $(BUILD_DIR)/$(TARGET).elf
 # Step 4: codec_cleaner post-process -> OpenMDUV380.bin
 $(BUILD_DIR)/OpenMDUV380.bin: $(BUILD_DIR)/$(TARGET).bin
 	@echo "  CLEAN $@"
-	@cd $(BUILD_DIR) && ../tools/codec_cleaner.Linux -i $(TARGET).bin -o OpenMDUV380.bin
+	@cd $(BUILD_DIR) && python3 ../tools/codec_cleaner.py -i $(TARGET).bin -o OpenMDUV380.bin
 	@ls -la $@
 
 # pattern rules

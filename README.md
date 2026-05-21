@@ -71,8 +71,9 @@ cd MDUV380_firmware
 make            # produces build/OpenMDUV380.bin
 ```
 
-On macOS, the build is driven through a podman container (the codec_cleaner
-helper is x86_64 Linux-only) — those scripts are not in this repo.
+The build runs natively on macOS as well — `codec_cleaner` is now a portable
+Python script (`MDUV380_firmware/tools/codec_cleaner.py`), so no podman
+container is needed for this step.
 
 > ⚠️ The build relies on the AMBE codec being patched in at **flash time**
 > from a separate "donor" firmware. This repository contains zero AMBE
