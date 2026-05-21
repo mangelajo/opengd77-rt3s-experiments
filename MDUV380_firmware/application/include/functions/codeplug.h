@@ -434,6 +434,7 @@ void codeplugInitChannelsPerZone(void);
 bool codeplugGetOpenGD77CustomData(CodeplugCustomDataType_t dataType, uint8_t *dataBuf);
 bool codeplugSetOpenGD77CustomData(CodeplugCustomDataType_t dataType, uint8_t *dataBuf, int len);
 bool codeplugResetOpenGD77CustomDataArea(void);
+bool codeplugCustomDataAreaIsInitialised(void);
 
 void codeplugAllChannelsInitCache(void);
 void codeplugInitCaches(void);

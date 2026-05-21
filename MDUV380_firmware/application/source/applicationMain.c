@@ -45,6 +45,7 @@
 #include "user_interface/menuSystem.h"
 #include "user_interface/uiUtilities.h"
 #include "user_interface/uiLocalisation.h"
+#include "functions/codeplug.h"
 #include "functions/ticks.h"
 #include "interfaces/batteryAndPowerManagement.h"
 #include "interfaces/gps.h"
@@ -505,6 +506,19 @@ void applicationMainTask(void)
 #endif
 
 	menuSystemInit(getRtcTime_custom());
+
+	// One-shot recovery: if the OpenGD77 custom-data region has no signature
+	// (typical on radios codeplugged via tools like qdmr that don't initialise
+	// this area), format it now so themes / boot image / custom beep / TLE
+	// saves work. Safe by construction — without the signature the firmware
+	// can't have stored anything here, so nothing is lost. Self-healing: next
+	// boot the check passes and this is a no-op.
+	if (!codeplugCustomDataAreaIsInitialised())
+	{
+		bool ok = codeplugResetOpenGD77CustomDataArea();
+		uiNotificationShow(NOTIFICATION_TYPE_MESSAGE, NOTIFICATION_ID_MESSAGE, 2500,
+				(ok ? "Storage init." : "Init failed"), true);
+	}
 
 #if defined(HAS_GPS)
 	gpsInit();
