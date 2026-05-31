@@ -1,5 +1,6 @@
 # Build output (Makefile-driven)
 MDUV380_firmware/build/
+MDUV380_firmware/dist/
 
 # Codec placeholder produced by `codec_cleaner -C`
 MDUV380_firmware/application/source/linkerdata/codec_bin_section_1.bin

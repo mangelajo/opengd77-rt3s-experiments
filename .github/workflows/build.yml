@@ -1,0 +1,83 @@
+name: Build firmware
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: MDUV380 (RT3S / MD-UV380)
+            platform: MDUV380
+            variant: ""
+          - name: MDUV380 +10W variant
+            platform: MDUV380
+            variant: UV380_PLUS_10W
+          - name: MD2017
+            platform: MD2017
+            variant: ""
+          - name: RT84 / DM-1701
+            platform: RT84_DM1701
+            variant: DM1701
+          - name: MD380
+            platform: MD380
+            variant: ""
+
+    env:
+      IMG_TAG: opengd77-mduv380-builder:latest
+      CONTAINER_ENGINE: docker
+
+    defaults:
+      run:
+        working-directory: MDUV380_firmware
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build (cached) container image
+        uses: docker/build-push-action@v6
+        with:
+          context: MDUV380_firmware
+          file: MDUV380_firmware/Containerfile
+          tags: ${{ env.IMG_TAG }}
+          load: true
+          cache-from: type=gha,scope=builder-image
+          cache-to: type=gha,scope=builder-image,mode=max
+
+      - name: Derive artifact name
+        id: name
+        run: |
+          if [ -n "${{ matrix.variant }}" ]; then
+            echo "out=OpenGD77_${{ matrix.platform }}_${{ matrix.variant }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "out=OpenGD77_${{ matrix.platform }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build firmware (${{ matrix.platform }} ${{ matrix.variant }})
+        run: |
+          make build \
+            CONTAINER_ENGINE=docker \
+            PLATFORM=${{ matrix.platform }} \
+            VARIANT=${{ matrix.variant }}
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.name.outputs.out }}
+          path: MDUV380_firmware/build/${{ steps.name.outputs.out }}.bin
+          if-no-files-found: error

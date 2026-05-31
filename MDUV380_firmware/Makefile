@@ -4,6 +4,22 @@
 TARGET    := MDUV380_FW
 BUILD_DIR := build
 
+# --- target platform / variant ----------------------------------------------
+# Override on the command line, e.g.
+#     make all PLATFORM=MD2017
+#     make all PLATFORM=RT84_DM1701 VARIANT=DM1701
+#     make build PLATFORM=MDUV380 VARIANT=UV380_PLUS_10W
+PLATFORM ?= MDUV380
+VARIANT  ?=
+
+PLATFORM_DEFS := -DPLATFORM_$(PLATFORM)
+ifneq ($(strip $(VARIANT)),)
+PLATFORM_DEFS += -DPLATFORM_VARIANT_$(VARIANT)
+OUT_NAME      ?= OpenGD77_$(PLATFORM)_$(VARIANT)
+else
+OUT_NAME      ?= OpenGD77_$(PLATFORM)
+endif
+
 # --- toolchain ---------------------------------------------------------------
 CROSS    := arm-none-eabi-
 CC       := $(CROSS)gcc
@@ -19,7 +35,7 @@ MCU_FLAGS := -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
 DEFS := \
     -DUSE_HAL_DRIVER \
     -DSTM32F405xx \
-    -DPLATFORM_MDUV380
+    $(PLATFORM_DEFS)
 
 # Optional language pack (uncomment one to bake a default language)
 # DEFS += -DLANGUAGE_BUILD_JAPANESE
@@ -74,7 +90,7 @@ DEPS := $(OBJS:.o=.d)
 # --- targets -----------------------------------------------------------------
 .PHONY: all clean prepare flash-bin
 
-all: $(BUILD_DIR)/OpenMDUV380.bin
+all: $(BUILD_DIR)/$(OUT_NAME).bin
 
 # Step 1: generate the codec placeholder before compilation
 prepare:
@@ -91,10 +107,10 @@ $(BUILD_DIR)/$(TARGET).bin: $(BUILD_DIR)/$(TARGET).elf
 	@echo "  BIN   $@"
 	@$(OBJCOPY) -O binary -S $< $@
 
-# Step 4: codec_cleaner post-process -> OpenMDUV380.bin
-$(BUILD_DIR)/OpenMDUV380.bin: $(BUILD_DIR)/$(TARGET).bin
+# Step 4: codec_cleaner post-process -> $(OUT_NAME).bin
+$(BUILD_DIR)/$(OUT_NAME).bin: $(BUILD_DIR)/$(TARGET).bin
 	@echo "  CLEAN $@"
-	@cd $(BUILD_DIR) && python3 ../tools/codec_cleaner.py -i $(TARGET).bin -o OpenMDUV380.bin
+	@cd $(BUILD_DIR) && python3 ../tools/codec_cleaner.py -i $(TARGET).bin -o $(OUT_NAME).bin
 	@ls -la $@
 
 # pattern rules
@@ -114,7 +130,7 @@ $(BUILD_DIR)/%.o: %.S
 	@$(AS) $(ASFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_DIR) $(DIST_DIR)
 
 # --- containerised build (run from the HOST) --------------------------------
 # The build needs a Linux ARM toolchain, so "make build" drives a podman
@@ -132,6 +148,7 @@ SRC_DIR          := $(abspath $(CURDIR)/..)
 CONTAINER_RUN = $(CONTAINER_ENGINE) run --rm \
                 -v $(SRC_DIR):/src:Z \
                 -w /src/MDUV380_firmware \
+                -e PLATFORM=$(PLATFORM) -e VARIANT=$(VARIANT) \
                 $(IMG_TAG)
 
 .PHONY: image build rebuild help
@@ -141,18 +158,44 @@ image:
 	    $(CONTAINER_ENGINE) build -f $(CURDIR)/Containerfile -t $(IMG_TAG) $(CURDIR)
 
 build: image
-	$(CONTAINER_RUN) make -j$(JOBS) all
-	@test -f $(BUILD_DIR)/OpenMDUV380.bin && ls -la $(BUILD_DIR)/OpenMDUV380.bin
-	@command -v shasum >/dev/null 2>&1 && shasum -a 256 $(BUILD_DIR)/OpenMDUV380.bin || true
+	$(CONTAINER_RUN) make -j$(JOBS) all PLATFORM=$(PLATFORM) VARIANT=$(VARIANT)
+	@test -f $(BUILD_DIR)/$(OUT_NAME).bin && ls -la $(BUILD_DIR)/$(OUT_NAME).bin
+	@command -v shasum >/dev/null 2>&1 && shasum -a 256 $(BUILD_DIR)/$(OUT_NAME).bin || true
 
 rebuild: image
-	$(CONTAINER_RUN) sh -c 'make clean && make -j$(JOBS) all'
+	$(CONTAINER_RUN) sh -c 'make clean && make -j$(JOBS) all PLATFORM=$(PLATFORM) VARIANT=$(VARIANT)'
+
+# Build every supported radio variant in sequence. Each iteration runs in a
+# fresh build/ tree so object files compiled for one PLATFORM don't leak into
+# the next. Mirrors the matrix used by .github/workflows/build.yml.
+ALL_VARIANTS := \
+    MDUV380: \
+    MDUV380:UV380_PLUS_10W \
+    MD2017: \
+    RT84_DM1701:DM1701 \
+    MD380:
+
+DIST_DIR := dist
+
+build-all: image
+	@mkdir -p $(DIST_DIR)
+	@set -e; for v in $(ALL_VARIANTS); do \
+	    p=$${v%%:*}; r=$${v#*:}; \
+	    echo "=== building PLATFORM=$$p VARIANT=$$r ==="; \
+	    $(CONTAINER_RUN) sh -c "make clean && make -j$(JOBS) all PLATFORM=$$p VARIANT=$$r && cp build/OpenGD77_*.bin $(DIST_DIR)/"; \
+	done
+	@echo '=== build-all complete ==='
+	@ls -la $(DIST_DIR)/OpenGD77_*.bin
+	@command -v shasum >/dev/null 2>&1 && shasum -a 256 $(DIST_DIR)/OpenGD77_*.bin || true
 
 help:
 	@echo 'OpenGD77 MDUV380 firmware -- make targets (run from MDUV380_firmware/):'
 	@echo ''
-	@echo '  make build     Compile the firmware (build/OpenMDUV380.bin) via podman'
+	@echo '  make build     Compile the firmware (build/$(OUT_NAME).bin) via podman'
+	@echo '                 Override target: PLATFORM={MDUV380|MD2017|RT84_DM1701|MD380}'
+	@echo '                 Optional:        VARIANT={UV380_PLUS_10W|DM1701}'
 	@echo '  make rebuild   Clean and compile from scratch'
+	@echo '  make build-all Build every variant; bins land in dist/'
 	@echo '  make image     Build the podman builder image (cached after first run)'
 	@echo '  make flash     Flash the firmware to an MD-UV380 held in DFU mode'
 	@echo '  make flash-md2017 | flash-dm1701 | flash-md380'
@@ -172,13 +215,13 @@ help:
 # override on the command line, e.g.:
 #     make flash LOADER=/path/to/opengd77_stm32_firmware_loader.py
 #
-# NOTE: this Makefile builds the firmware with -DPLATFORM_MDUV380.  The flash-*
-# targets below only switch the upload cipher; running this binary on a
-# non-MDUV380 radio family is unlikely to boot without rebuilding with the
-# matching PLATFORM_* define.
+# NOTE: the flash-* targets below only switch the upload cipher; the firmware
+# binary must already have been built with the matching PLATFORM=<x> (see the
+# build/all targets above).  Override FIRMWARE_BIN if your bin is named
+# differently, e.g.  make flash-md2017 FIRMWARE_BIN=build/OpenGD77_MD2017.bin
 LOADER       ?= ../../../tools/mduv380_tools/opengd77_stm32_firmware_loader.py
 PYTHON       ?= ../../../.venv/bin/python
-FIRMWARE_BIN := $(BUILD_DIR)/OpenMDUV380.bin
+FIRMWARE_BIN := $(BUILD_DIR)/$(OUT_NAME).bin
 
 .PHONY: flash flash-mduv380 flash-md2017 flash-dm1701 flash-md380
 
