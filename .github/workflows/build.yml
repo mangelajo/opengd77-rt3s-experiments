@@ -3,11 +3,12 @@ name: Build firmware
 on:
   push:
     branches: [main]
+    tags: ['R*-EA4IPW*']
   pull_request:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write  # release job needs to create releases on tag pushes
 
 jobs:
   build:
@@ -75,3 +76,38 @@ jobs:
           name: ${{ steps.name.outputs.out }}
           path: MDUV380_firmware/build/${{ steps.name.outputs.out }}.bin
           if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/R') && contains(github.ref, '-EA4IPW')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all firmware artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Stage release files
+        run: |
+          mkdir -p release
+          # download-artifact@v4 unpacks each artifact into its own subdir;
+          # flatten the .bin files and sha256 them.
+          find dist -name '*.bin' -exec cp {} release/ \;
+          cd release && sha256sum *.bin > SHA256SUMS && cat SHA256SUMS
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            Unofficial build by EA4IPW based on upstream OpenGD77 source.
+
+            **Not affiliated with the OpenGD77 project.** For canonical
+            firmware see <https://www.opengd77.com/>.
+
+            Verify downloads against `SHA256SUMS`.

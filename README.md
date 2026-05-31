@@ -68,7 +68,15 @@ the IDE.
 ```sh
 # inside an Ubuntu / Debian environment with the ARM toolchain installed
 cd MDUV380_firmware
-make            # produces build/OpenMDUV380.bin
+make            # produces build/OpenGD77_MDUV380.bin
+```
+
+Other variants:
+
+```sh
+make build PLATFORM=MDUV380 VARIANT=UV380_PLUS_10W   # 10W mod
+make build PLATFORM=RT84_DM1701 VARIANT=DM1701        # Retevis RT-84 / Baofeng DM-1701
+make build-all                                        # all three; bins land in dist/
 ```
 
 The build runs natively on macOS as well — `codec_cleaner` is now a portable
@@ -78,6 +86,49 @@ container is needed for this step.
 > ⚠️ The build relies on the AMBE codec being patched in at **flash time**
 > from a separate "donor" firmware. This repository contains zero AMBE
 > code or data. See the OpenGD77 docs for the codec/flashing workflow.
+
+## Cutting a release
+
+CI is wired to publish a GitHub Release whenever a tag matching
+`R<upstream-date>-EA4IPW.<n>` is pushed. The tag scheme anchors each
+release to the upstream source snapshot it was built from, so it's
+always obvious which upstream `R<date>` a binary descends from.
+
+**Tag format:** `R<YYYYMMDD>-EA4IPW.<N>`
+- `<YYYYMMDD>` — the date of the upstream OpenGD77 release this fork
+  tracks (matches the upstream `R<date>` directories on opengd77.eu).
+- `<N>` — incrementing build number against that upstream base, starting
+  at `1`. Bump when you cut a new release off the same upstream snapshot.
+
+Examples:
+- `R20260131-EA4IPW.1` — first release built from upstream R20260131.
+- `R20260131-EA4IPW.2` — second release, still on R20260131.
+- `R20260504-EA4IPW.1` — first release after rebasing on upstream R20260504.
+
+**How to cut a release:**
+
+```sh
+# make sure main is green and you're on the commit you want to ship
+git fetch origin
+git switch main
+git pull
+
+# tag, annotated, with a short note
+git tag -a R20260131-EA4IPW.1 -m "Custom-data healing + waterfall VFO tint"
+git push origin R20260131-EA4IPW.1
+```
+
+CI then:
+
+1. Runs the full build matrix (MDUV380, MDUV380 +10W, RT84/DM-1701).
+2. Downloads all `.bin` artifacts and generates a `SHA256SUMS` file.
+3. Creates a public GitHub Release at the tag, with auto-generated
+   release notes (commit list since the previous tag) and the bins
+   attached.
+
+To remove a bad release: delete the tag both locally and on the
+remote (`git tag -d <tag>; git push origin :refs/tags/<tag>`) and
+delete the corresponding Release in the GitHub UI.
 
 ## Local experiments
 
