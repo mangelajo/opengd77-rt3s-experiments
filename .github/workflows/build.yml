@@ -93,9 +93,16 @@ jobs:
       - name: Stage release files
         run: |
           mkdir -p release
-          # download-artifact@v4 unpacks each artifact into its own subdir;
-          # flatten the .bin files and sha256 them.
-          find dist -name '*.bin' -exec cp {} release/ \;
+          # download-artifact@v4 unpacks each artifact into its own subdir.
+          # Rename the bins to the friendlier marketing names downstream
+          # users actually recognise (RT3S is the most common name for the
+          # MDUV380-family hardware in this hemisphere), then sha256 them.
+          cp dist/OpenGD77_MDUV380/OpenGD77_MDUV380.bin \
+             release/OpenGD77_MDUV380_RT3S.bin
+          cp dist/OpenGD77_MDUV380_UV380_PLUS_10W/OpenGD77_MDUV380_UV380_PLUS_10W.bin \
+             release/OpenGD77_MDUV380_RT3S_10W.bin
+          cp dist/OpenGD77_RT84_DM1701_DM1701/OpenGD77_RT84_DM1701_DM1701.bin \
+             release/OpenGD77_RT84_DM1701.bin
           cd release && sha256sum *.bin > SHA256SUMS && cat SHA256SUMS
 
       - name: Create / update GitHub Release
@@ -110,5 +117,13 @@ jobs:
 
             **Not affiliated with the OpenGD77 project.** For canonical
             firmware see <https://www.opengd77.com/>.
+
+            ### Which bin do I need?
+
+            | File | Radio |
+            |---|---|
+            | `OpenGD77_MDUV380_RT3S.bin` | Retevis RT3S (incl. GPS), TYT MD-UV380, MD-380UV (stock 5W hardware) |
+            | `OpenGD77_MDUV380_RT3S_10W.bin` | Same family with the **10W power-amp mod** applied |
+            | `OpenGD77_RT84_DM1701.bin` | Retevis RT-84, Baofeng DM-1701 |
 
             Verify downloads against `SHA256SUMS`.
