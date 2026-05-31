@@ -24,15 +24,9 @@ jobs:
           - name: MDUV380 +10W variant
             platform: MDUV380
             variant: UV380_PLUS_10W
-          - name: MD2017
-            platform: MD2017
-            variant: ""
           - name: RT84 / DM-1701
             platform: RT84_DM1701
             variant: DM1701
-          - name: MD380
-            platform: MD380
-            variant: ""
 
     env:
       IMG_TAG: opengd77-mduv380-builder:latest

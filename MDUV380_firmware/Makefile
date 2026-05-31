@@ -171,9 +171,7 @@ rebuild: image
 ALL_VARIANTS := \
     MDUV380: \
     MDUV380:UV380_PLUS_10W \
-    MD2017: \
-    RT84_DM1701:DM1701 \
-    MD380:
+    RT84_DM1701:DM1701
 
 DIST_DIR := dist
 
@@ -192,7 +190,7 @@ help:
 	@echo 'OpenGD77 MDUV380 firmware -- make targets (run from MDUV380_firmware/):'
 	@echo ''
 	@echo '  make build     Compile the firmware (build/$(OUT_NAME).bin) via podman'
-	@echo '                 Override target: PLATFORM={MDUV380|MD2017|RT84_DM1701|MD380}'
+	@echo '                 Override target: PLATFORM={MDUV380|RT84_DM1701}'
 	@echo '                 Optional:        VARIANT={UV380_PLUS_10W|DM1701}'
 	@echo '  make rebuild   Clean and compile from scratch'
 	@echo '  make build-all Build every variant; bins land in dist/'
