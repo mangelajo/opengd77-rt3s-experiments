@@ -296,6 +296,7 @@ typedef uint32_t time_t_custom;     /* date/time in unix secs past 1-Jan-70 */
 #define VFO_SWEEP_RSSI_NOISE_FLOOR_MIN         4
 #define VFO_SWEEP_RSSI_NOISE_FLOOR_MAX        24
 #define VFO_SWEEP_RSSI_NOISE_FLOOR_DEFAULT    14
+#define VFO_SWEEP_SETTINGS_WATERFALL_BIT      0x8000U
 
 #define SCREEN_LINE_BUFFER_SIZE               17 // 16 characters (for a 8 pixels font width) + NULL
 #define LOCATION_TEXT_BUFFER_SIZE             32

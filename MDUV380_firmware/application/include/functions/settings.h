@@ -195,7 +195,7 @@ typedef struct
 	uint8_t				timezone;// Lower 7 bits are the timezone. 64 = UTC, values < 64 are negative TZ values.  Bit 8 is a flag which indicates TZ/UTC. 0 = UTC
 	// -----------------------------------------------
 	uint8_t				beepOptions; // 2 pairs of bits + 1 (TX and RX beeps)
-	uint16_t			vfoSweepSettings; // 3bits: channel step | 5 bits: RSSI noise floor | 7bits: gain
+	uint16_t			vfoSweepSettings; // bit15: waterfall on (VFO_SWEEP_SETTINGS_WATERFALL_BIT) | bits14-12: channel step | bits11-7: RSSI noise floor | bits6-0: gain
 	uint32_t			overrideTG;
 	uint32_t			vfoScanLow[2]; // low frequency for VFO Scanning
 	uint32_t			vfoScanHigh[2]; // High frequency for VFO Scanning

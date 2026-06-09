@@ -397,7 +397,7 @@ bool settingsRestoreDefaultSettings(void)
 	nonVolatileSettings.dmrRxAGC = 0;// disabled
 	nonVolatileSettings.apo = 0;
 
-	nonVolatileSettings.vfoSweepSettings = ((((sizeof(VFO_SWEEP_SCAN_RANGE_SAMPLE_STEP_TABLE) / sizeof(VFO_SWEEP_SCAN_RANGE_SAMPLE_STEP_TABLE[0])) - 1) << 12) | (VFO_SWEEP_RSSI_NOISE_FLOOR_DEFAULT << 7) | VFO_SWEEP_GAIN_DEFAULT);
+	nonVolatileSettings.vfoSweepSettings = (VFO_SWEEP_SETTINGS_WATERFALL_BIT | (((sizeof(VFO_SWEEP_SCAN_RANGE_SAMPLE_STEP_TABLE) / sizeof(VFO_SWEEP_SCAN_RANGE_SAMPLE_STEP_TABLE[0])) - 1) << 12) | (VFO_SWEEP_RSSI_NOISE_FLOOR_DEFAULT << 7) | VFO_SWEEP_GAIN_DEFAULT);
 
 	nonVolatileSettings.keypadTimerLong = 5U;
 	nonVolatileSettings.keypadTimerRepeat = 3U;
